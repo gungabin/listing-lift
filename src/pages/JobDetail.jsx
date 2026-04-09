@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import AppNav from '@/components/layout/AppNav';
@@ -17,82 +17,13 @@ const STYLE_LABELS = {
   transitional: 'Transitional', smart_pick: 'Smart Pick',
 };
 
-// Interactive before/after slider for the job detail view
-function CompareSlider({ before, after }) {
-  const [position, setPosition] = useState(50);
-  const containerRef = useRef(null);
-  const dragging = useRef(false);
-
-  const updatePosition = (clientX) => {
-    const rect = containerRef.current.getBoundingClientRect();
-    const x = Math.max(0, Math.min(clientX - rect.left, rect.width));
-    setPosition((x / rect.width) * 100);
-  };
-
-  const onMouseDown = () => { dragging.current = true; };
-  const onMouseUp = () => { dragging.current = false; };
-  const onMouseMove = (e) => { if (dragging.current) updatePosition(e.clientX); };
-  const onTouchMove = (e) => { updatePosition(e.touches[0].clientX); };
-
-  useEffect(() => {
-    window.addEventListener('mouseup', onMouseUp);
-    window.addEventListener('mousemove', onMouseMove);
-    return () => {
-      window.removeEventListener('mouseup', onMouseUp);
-      window.removeEventListener('mousemove', onMouseMove);
-    };
-  }, []);
-
-  return (
-    <div
-      ref={containerRef}
-      className="relative w-full aspect-[4/3] overflow-hidden rounded-sm select-none cursor-col-resize bg-[#E8E0D8]"
-      onTouchMove={onTouchMove}
-    >
-      {/* After (full base) */}
-      <img src={after} alt="Staged" className="absolute inset-0 w-full h-full object-cover" />
-
-      {/* Before (clipped left side) */}
-      <div className="absolute inset-0 overflow-hidden" style={{ width: `${position}%` }}>
-        <img
-          src={before}
-          alt="Original"
-          className="absolute inset-0 w-full h-full object-cover"
-          style={{ minWidth: containerRef.current?.offsetWidth || 600 }}
-        />
-      </div>
-
-      {/* Divider */}
-      <div className="absolute top-0 bottom-0 w-px bg-white shadow-lg" style={{ left: `${position}%` }}>
-        <div
-          className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-9 h-9 bg-white rounded-full shadow-xl flex items-center justify-center cursor-grab active:cursor-grabbing"
-          onMouseDown={onMouseDown}
-          onTouchStart={() => { dragging.current = true; }}
-          onTouchEnd={() => { dragging.current = false; }}
-        >
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-            <path d="M7 4L3 10L7 16M13 4L17 10L13 16" stroke="#8B6F5C" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </div>
-      </div>
-
-      {/* Labels */}
-      <div className="absolute bottom-3 left-3 bg-black/60 backdrop-blur-sm text-white text-xs font-sans uppercase tracking-widest px-3 py-1">
-        Original
-      </div>
-      <div className="absolute bottom-3 right-3 bg-[#8B6F5C]/90 backdrop-blur-sm text-white text-xs font-sans uppercase tracking-widest px-3 py-1">
-        AI Staged
-      </div>
-    </div>
-  );
-}
-
 export default function JobDetail() {
   const { id } = useParams();
   const [user, setUser] = useState(null);
   const [subscription, setSubscription] = useState(null);
   const [job, setJob] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [view, setView] = useState('staged'); // 'staged' | 'original'
 
   useEffect(() => {
     loadAll();
@@ -194,16 +125,50 @@ export default function JobDetail() {
               </div>
             )}
 
-            {/* Completed: before/after slider */}
-            {job.status === 'completed' && job.original_image_url && job.staged_image_url && (
+            {/* Completed: toggle between original and staged */}
+            {job.status === 'completed' && job.staged_image_url && (
               <div className="mb-10">
-                <p className="text-xs uppercase tracking-widest font-sans text-[#8B6F5C] mb-3">Before & After</p>
-                <CompareSlider before={job.original_image_url} after={job.staged_image_url} />
-                <p className="text-center text-xs font-sans text-[#A89080] mt-2 tracking-wide">← Drag to compare →</p>
+                {/* Toggle */}
+                <div className="flex items-center gap-0 mb-4 inline-flex border border-[#E0D9D3]">
+                  <button
+                    onClick={() => setView('staged')}
+                    className={`px-5 py-2 text-xs font-sans uppercase tracking-widest transition-colors ${
+                      view === 'staged' ? 'bg-[#2C2C2C] text-white' : 'text-[#8B6F5C] hover:text-[#2C2C2C]'
+                    }`}
+                  >
+                    AI Staged
+                  </button>
+                  <button
+                    onClick={() => setView('original')}
+                    className={`px-5 py-2 text-xs font-sans uppercase tracking-widest transition-colors ${
+                      view === 'original' ? 'bg-[#2C2C2C] text-white' : 'text-[#8B6F5C] hover:text-[#2C2C2C]'
+                    }`}
+                  >
+                    Original
+                  </button>
+                </div>
+
+                {/* Image */}
+                <div className="aspect-[4/3] bg-[#E8E0D8] overflow-hidden rounded-sm relative">
+                  <img
+                    key={view}
+                    src={view === 'staged' ? job.staged_image_url : job.original_image_url}
+                    alt={view === 'staged' ? 'AI staged room' : 'Original room'}
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur-sm px-3 py-1.5">
+                    <p className="text-xs font-sans uppercase tracking-widest text-[#8B6F5C]">
+                      {view === 'staged'
+                        ? `AI Staged · ${STYLE_LABELS[job.decor_style] || job.decor_style}`
+                        : 'Original Photo'
+                      }
+                    </p>
+                  </div>
+                </div>
               </div>
             )}
 
-            {/* Processing state: show blurred original */}
+            {/* Processing state: blurred original */}
             {isProcessing && job.original_image_url && (
               <div className="mb-10 relative aspect-[4/3] bg-[#E8E0D8] overflow-hidden rounded-sm">
                 <img
