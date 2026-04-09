@@ -1,39 +1,49 @@
-**Welcome to your Base44 project** 
+# Listing Lift
 
-**About**
+AI-powered virtual home staging for real estate agents. Upload photos of empty or cluttered rooms, choose a decor style, and get photorealistic staged images in minutes — at a fraction of traditional staging costs.
 
-View and Edit  your app on [Base44.com](http://Base44.com) 
+## Tech Stack
 
-This project contains everything you need to run your app locally.
+- React + Vite + Tailwind CSS
+- shadcn/ui (Radix UI)
+- react-router-dom v6
+- framer-motion
+- Fonts: Cormorant Garamond + Inter
 
-**Edit the code in your local development environment**
+## Local Development
 
-Any change pushed to the repo will also be reflected in the Base44 Builder.
-
-**Prerequisites:** 
-
-1. Clone the repository using the project's Git URL 
-2. Navigate to the project directory
-3. Install dependencies: `npm install`
-4. Create an `.env.local` file and set the right environment variables
-
-```
-VITE_BASE44_APP_ID=your_app_id
-VITE_BASE44_APP_BASE_URL=your_backend_url
-
-e.g.
-VITE_BASE44_APP_ID=cbef744a8545c389ef439ea6
-VITE_BASE44_APP_BASE_URL=https://my-to-do-list-81bfaad7.base44.app
+```bash
+npm install
+npm run dev
 ```
 
-Run the app: `npm run dev`
+No environment variables needed to run locally. The app uses a mock backend stored in `localStorage`.
 
-**Publish your changes**
+## Project Structure
 
-Open [Base44.com](http://Base44.com) and click on Publish.
+```
+src/
+  api/            # Mock backend client — swap internals here when going live
+  components/     # Shared UI (layout, staging workflow, shadcn/ui)
+  pages/          # Route-level pages (Landing, Dashboard, Pricing, etc.)
+  lib/            # Auth context, utilities
+```
 
-**Docs & Support**
+## Routes
 
-Documentation: [https://docs.base44.com/Integrations/Using-GitHub](https://docs.base44.com/Integrations/Using-GitHub)
+| Path | Page |
+|---|---|
+| `/` | Landing |
+| `/pricing` | Pricing |
+| `/dashboard` | Staging workflow |
+| `/history` | Past jobs |
+| `/account` | Subscription + profile |
+| `/jobs/:id` | Job detail with before/after |
+| `/terms` | Terms of service |
 
-Support: [https://app.base44.com/support](https://app.base44.com/support)
+## Roadmap
+
+- [ ] Real auth (Firebase Auth or Auth0)
+- [ ] AI image generation (OpenAI / Replicate)
+- [ ] Stripe subscription billing
+- [ ] Deploy to Vercel
