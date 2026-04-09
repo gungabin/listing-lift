@@ -1,17 +1,94 @@
 /**
- * Mock Base44 Client
+ * Listing Lift — API Client
  *
- * Drop-in replacement for the real Base44 SDK. All pages import `base44` from here —
- * this mock keeps them working 100% locally with no backend connection.
+ * Handles all data + staging operations. Two modes:
  *
- * Persistence: jobs + subscription stored in localStorage.
- * Images: original photos are blob URLs (lost on page refresh — expected for local dev).
- * Staging: resolves with real staged room photos after a simulated delay.
+ * REAL MODE (when VITE_OPENAI_API_KEY is set in .env):
+ *   Calls OpenAI gpt-image-1 to actually stage the room photo.
  *
- * TO GO LIVE: Replace the internals of this file with real API calls.
- * The interface (base44.auth, base44.entities, base44.functions, base44.integrations)
- * stays the same — pages don't need to change.
+ * MOCK MODE (no API key):
+ *   Resolves with a sample Unsplash room image after a short delay.
+ *   Useful for UI work without burning API credits.
+ *
+ * TO GO LIVE:
+ *   Move the OpenAI call to a Vercel serverless function (/api/stage)
+ *   so the API key stays on the server and isn't exposed in the browser.
  */
+
+// ---------------------------------------------------------------------------
+// Prompts — tuned through extensive testing, do not modify lightly
+// ---------------------------------------------------------------------------
+const ROOM_PROMPTS = {
+  living_room: 'living room with sofa, coffee table, accent chairs, area rug, and decorative accessories',
+  bedroom: 'bedroom with bed frame, nightstands, dresser, lamps, and bedding',
+  dining_room: 'dining room with dining table, dining chairs, sideboard, and pendant lighting',
+  kitchen: 'kitchen with bar stools at island or counter, small decorative accessories on countertops',
+  office: 'home office with desk, office chair, bookshelf, desk lamp, and accessories',
+  bathroom: 'bathroom with towels, bath mat, vanity accessories, and small decor',
+  outdoor: 'outdoor patio with outdoor furniture, planters, and outdoor accessories',
+  other: 'room with appropriate furniture and decor',
+};
+
+const STYLE_DESCRIPTORS = {
+  modern: 'sleek modern style with clean lines, neutral tones, minimal clutter, high-contrast accents, polished surfaces',
+  farmhouse: 'warm farmhouse style with shiplap textures, natural wood tones, linen fabrics, vintage accents, cozy rustic warmth',
+  coastal: 'coastal style with light blues, whites, natural textures, woven accents, breezy and relaxed atmosphere',
+  traditional: 'classic traditional style with rich wood tones, symmetrical arrangements, formal elegance, warm deep colors',
+  mid_century: 'mid-century modern style with tapered legs, warm wood tones, earthy palette, retro geometric patterns',
+  scandinavian: 'Scandinavian style with white walls, light wood, minimal clean design, cozy hygge textures',
+  transitional: 'transitional style blending traditional and modern, neutral palette, sophisticated and timeless',
+};
+
+const LEVEL_DESCRIPTORS = {
+  light: 'Add only a few key accent pieces — one or two small furniture items, minimal accessories. Keep it sparse and open.',
+  medium: 'Add the main furniture pieces for this room type and a moderate amount of accessories. Balanced and livable.',
+  full: 'Fully stage the room with complete furniture arrangement, layered textiles, art, plants, and rich accessories. Lush and complete.',
+};
+
+function buildStagingPrompt(roomType, decorStyle, decorLevel) {
+  const roomDesc = ROOM_PROMPTS[roomType] || ROOM_PROMPTS.other;
+  const styleDesc = STYLE_DESCRIPTORS[decorStyle] || STYLE_DESCRIPTORS.transitional;
+  const levelDesc = LEVEL_DESCRIPTORS[decorLevel] || LEVEL_DESCRIPTORS.medium;
+
+  return `You are a professional virtual home stager. Your ONLY job is to place freestanding furniture and small accessories into the empty floor space of this room photo. Think of it as placing physical objects into the room — nothing else changes.
+
+ABSOLUTE PROHIBITIONS — violating any of these is a critical failure:
+
+WINDOWS & OUTSIDE:
+- The view through every window must be preserved with 100% pixel accuracy — same trees, same sky, same buildings, same colors, same lighting outside
+- DO NOT add, remove, or change curtains, blinds, shutters, or any window treatments
+- DO NOT alter window frames, glass, or anything seen through the glass
+
+WALLS, FLOORS & STRUCTURE:
+- DO NOT change wall color, texture, paint, paneling, shiplap, wallpaper, or any wall surface
+- DO NOT change flooring material, color, pattern, or texture
+- DO NOT alter ceiling, crown molding, baseboards, or any architectural trim
+- DO NOT add, remove, or change doors or door frames
+
+FIXED ROOM FEATURES — every item below must remain exactly as it appears in the original photo:
+- Every electrical outlet, wall plate, coax plate, ethernet plate, USB plate — preserve the exact type and appearance
+- Every light switch and switch plate
+- Every HVAC vent, air return, diffuser
+- Every smoke detector, carbon monoxide detector, sprinkler head
+- Every thermostat, keypad, or wall-mounted device
+- Every built-in fixture, recessed light, ceiling fan
+- If any of these items would be hidden behind furniture you are placing, you may place the furniture in front — but never alter the item itself
+
+LIGHTING:
+- DO NOT change the existing light, shadow, or exposure of the room
+- Only add shadows cast by new furniture items you place, consistent with existing light direction
+
+YOU MAY ONLY:
+- Place freestanding furniture on the floor (sofas, chairs, tables, beds, rugs, bookshelves)
+- Place small accessories on top of furniture you added (lamps, plants, books, vases, bowls)
+- Everything you add must match the room's existing perspective, scale, and lighting exactly
+- The final result must look like a real photograph with furniture added — not a rendering or illustration
+
+STAGING REQUIREMENTS:
+- Room: ${roomDesc}
+- Style: ${styleDesc}
+- Density: ${levelDesc}`;
+}
 
 // ---------------------------------------------------------------------------
 // Storage keys
@@ -20,7 +97,14 @@ const JOBS_KEY = 'll_jobs';
 const SUB_KEY = 'll_subscription';
 
 // ---------------------------------------------------------------------------
-// Mock user — swap for real auth when going live
+// In-memory file store: blobUrl -> File
+// File objects can't go in localStorage, so we keep them in memory.
+// They're only needed during the current session (same session = same blob URLs).
+// ---------------------------------------------------------------------------
+const fileStore = new Map();
+
+// ---------------------------------------------------------------------------
+// Mock user
 // ---------------------------------------------------------------------------
 const MOCK_USER = {
   id: 'mock_user_1',
@@ -29,7 +113,7 @@ const MOCK_USER = {
 };
 
 // ---------------------------------------------------------------------------
-// Mock subscription — edit generations_used here to test different states
+// Mock subscription
 // ---------------------------------------------------------------------------
 const DEFAULT_SUBSCRIPTION = {
   id: 'sub_mock_1',
@@ -43,77 +127,62 @@ const DEFAULT_SUBSCRIPTION = {
 };
 
 // ---------------------------------------------------------------------------
-// Staged result image pools — realistic room photos by room type
-// Used as mock AI output when a staging job completes
+// Mock staged image pool — used as fallback when no API key is present
 // ---------------------------------------------------------------------------
-const STAGED_IMAGES = {
+const MOCK_STAGED_IMAGES = {
   living_room: [
     'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=900&q=85',
     'https://images.unsplash.com/photo-1567225557594-88d73e55f2cb?w=900&q=85',
     'https://images.unsplash.com/photo-1484101403633-562f891dc89a?w=900&q=85',
-    'https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?w=900&q=85',
     'https://images.unsplash.com/photo-1600210492493-0946911123ea?w=900&q=85',
   ],
   bedroom: [
     'https://images.unsplash.com/photo-1540518614846-7eded433c457?w=900&q=85',
-    'https://images.unsplash.com/photo-1505693314120-0d443867891c?w=900&q=85',
     'https://images.unsplash.com/photo-1616594039964-ae9021a400a0?w=900&q=85',
     'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=900&q=85',
   ],
   dining_room: [
     'https://images.unsplash.com/photo-1615529328331-f8917597711f?w=900&q=85',
     'https://images.unsplash.com/photo-1524758631624-e2822e304c36?w=900&q=85',
-    'https://images.unsplash.com/photo-1550226891-ef816aed4a98?w=900&q=85',
   ],
   kitchen: [
     'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=900&q=85',
     'https://images.unsplash.com/photo-1484154218962-a197022b5858?w=900&q=85',
-    'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=900&q=85',
   ],
   office: [
     'https://images.unsplash.com/photo-1593642632559-0c6d3fc62b89?w=900&q=85',
-    'https://images.unsplash.com/photo-1619468129361-605ebea04b44?w=900&q=85',
     'https://images.unsplash.com/photo-1524758860510-e9b5f8fcd9c2?w=900&q=85',
   ],
   bathroom: [
     'https://images.unsplash.com/photo-1552321554-5fefe8c9ef14?w=900&q=85',
-    'https://images.unsplash.com/photo-1507652313519-d4e9174996dd?w=900&q=85',
     'https://images.unsplash.com/photo-1600566752355-35792bedcfea?w=900&q=85',
   ],
   outdoor: [
     'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=900&q=85',
     'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=900&q=85',
-    'https://images.unsplash.com/photo-1564501049412-61c2a3083791?w=900&q=85',
   ],
   other: [
     'https://images.unsplash.com/photo-1618219908412-a29a1bb7b86e?w=900&q=85',
-    'https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?w=900&q=85',
   ],
 };
 
 // ---------------------------------------------------------------------------
-// Local storage helpers
+// Storage helpers
 // ---------------------------------------------------------------------------
 function generateId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 }
 
 function getJobs() {
-  try {
-    return JSON.parse(localStorage.getItem(JOBS_KEY) || '[]');
-  } catch {
-    return [];
-  }
+  try { return JSON.parse(localStorage.getItem(JOBS_KEY) || '[]'); }
+  catch { return []; }
 }
 
 function saveJob(job) {
   const jobs = getJobs();
   const idx = jobs.findIndex((j) => j.id === job.id);
-  if (idx >= 0) {
-    jobs[idx] = job;
-  } else {
-    jobs.unshift(job);
-  }
+  if (idx >= 0) jobs[idx] = job;
+  else jobs.unshift(job);
   localStorage.setItem(JOBS_KEY, JSON.stringify(jobs));
 }
 
@@ -121,9 +190,7 @@ function getSubscription() {
   try {
     const stored = localStorage.getItem(SUB_KEY);
     return stored ? JSON.parse(stored) : DEFAULT_SUBSCRIPTION;
-  } catch {
-    return DEFAULT_SUBSCRIPTION;
-  }
+  } catch { return DEFAULT_SUBSCRIPTION; }
 }
 
 function saveSubscription(sub) {
@@ -131,91 +198,163 @@ function saveSubscription(sub) {
 }
 
 // ---------------------------------------------------------------------------
-// Mock staging simulation
-// Simulates the AI processing delay, then marks the job as completed
-// with a realistic staged room image.
+// Convert a File/Blob to PNG File (OpenAI image edits requires PNG)
 // ---------------------------------------------------------------------------
-function simulateStaging(jobId) {
-  // 8–15 second delay to mimic real AI processing
-  const delay = 8000 + Math.random() * 7000;
+async function toPngFile(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      canvas.getContext('2d').drawImage(img, 0, 0);
+      canvas.toBlob((blob) => {
+        URL.revokeObjectURL(url);
+        if (!blob) return reject(new Error('Failed to convert image to PNG'));
+        resolve(new File([blob], 'room.png', { type: 'image/png' }));
+      }, 'image/png');
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Failed to load image')); };
+    img.src = url;
+  });
+}
 
-  setTimeout(() => {
-    const jobs = getJobs();
-    const job = jobs.find((j) => j.id === jobId);
-    if (!job) return;
+// ---------------------------------------------------------------------------
+// Real AI staging — calls OpenAI gpt-image-1
+// ---------------------------------------------------------------------------
+async function runAiStaging(job) {
+  const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
 
-    const pool = STAGED_IMAGES[job.room_type] || STAGED_IMAGES.other;
-    const staged_image_url = pool[Math.floor(Math.random() * pool.length)];
+  // Get the original file from memory store
+  const originalFile = fileStore.get(job.original_image_url);
+  if (!originalFile) {
+    throw new Error('Original photo not found in session. Please re-upload and try again.');
+  }
+
+  // Convert to PNG (required by OpenAI image edits)
+  const pngFile = await toPngFile(originalFile);
+
+  const prompt = buildStagingPrompt(job.room_type, job.decor_style, job.decor_level);
+
+  const formData = new FormData();
+  formData.append('model', 'gpt-image-1');
+  formData.append('prompt', prompt);
+  formData.append('image', pngFile);
+  formData.append('quality', 'high');
+  formData.append('size', '1536x1024');
+
+  const response = await fetch('https://api.openai.com/v1/images/edits', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${apiKey}` },
+    body: formData,
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error?.message || `OpenAI error: ${response.status}`);
+  }
+
+  // gpt-image-1 returns base64
+  const b64 = data.data?.[0]?.b64_json;
+  if (!b64) throw new Error('No image returned from OpenAI');
+
+  // Decode base64 → blob URL so we can display it
+  const binaryStr = atob(b64);
+  const bytes = new Uint8Array(binaryStr.length);
+  for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
+  const blob = new Blob([bytes], { type: 'image/png' });
+  return URL.createObjectURL(blob);
+}
+
+// ---------------------------------------------------------------------------
+// Mock staging fallback — used when no API key is configured
+// ---------------------------------------------------------------------------
+function runMockStaging(job) {
+  return new Promise((resolve) => {
+    const delay = 6000 + Math.random() * 4000;
+    setTimeout(() => {
+      const pool = MOCK_STAGED_IMAGES[job.room_type] || MOCK_STAGED_IMAGES.other;
+      resolve(pool[Math.floor(Math.random() * pool.length)]);
+    }, delay);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Main staging dispatcher — called when stageImage is invoked
+// ---------------------------------------------------------------------------
+async function stageJob(jobId) {
+  const jobs = getJobs();
+  const job = jobs.find((j) => j.id === jobId);
+  if (!job) return;
+
+  const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
+
+  try {
+    let stagedImageUrl;
+
+    if (apiKey) {
+      // Real AI mode
+      stagedImageUrl = await runAiStaging(job);
+    } else {
+      // Mock mode — no API key configured
+      console.info('[Listing Lift] No VITE_OPENAI_API_KEY found — using mock staging. Add your key to .env to enable real AI.');
+      stagedImageUrl = await runMockStaging(job);
+    }
 
     job.status = 'completed';
-    job.staged_image_url = staged_image_url;
+    job.staged_image_url = stagedImageUrl;
     job.completed_date = new Date().toISOString();
     saveJob(job);
 
     // Increment usage counter
     const sub = getSubscription();
-    sub.generations_used = Math.min(
-      (sub.generations_used || 0) + 1,
-      sub.generations_limit
-    );
+    sub.generations_used = Math.min((sub.generations_used || 0) + 1, sub.generations_limit);
     saveSubscription(sub);
-  }, delay);
+
+  } catch (error) {
+    console.error('[Listing Lift] Staging failed:', error);
+    job.status = 'failed';
+    job.error_message = error.message;
+    saveJob(job);
+  }
 }
 
 // ---------------------------------------------------------------------------
-// The mock client — same interface as the Base44 SDK
+// The client — same interface used throughout the app
 // ---------------------------------------------------------------------------
 export const base44 = {
   auth: {
-    async me() {
-      return MOCK_USER;
-    },
-    logout(redirect) {
-      window.location.href = redirect || '/';
-    },
-    redirectToLogin(redirect) {
-      window.location.href = redirect || '/';
-    },
+    async me() { return MOCK_USER; },
+    logout(redirect) { window.location.href = redirect || '/'; },
+    redirectToLogin(redirect) { window.location.href = redirect || '/'; },
   },
 
   entities: {
     Subscription: {
-      async filter(query) {
-        const sub = getSubscription();
-        // Return active subscription if that's what's asked for
-        if (query?.status === 'active') return [sub];
-        return [sub];
-      },
+      async filter() { return [getSubscription()]; },
       async create(data) {
         const sub = { ...DEFAULT_SUBSCRIPTION, ...data, id: generateId() };
         saveSubscription(sub);
         return sub;
       },
       async update(id, data) {
-        const sub = getSubscription();
-        const updated = { ...sub, ...data };
-        saveSubscription(updated);
-        return updated;
+        const sub = { ...getSubscription(), ...data };
+        saveSubscription(sub);
+        return sub;
       },
     },
 
     StagingJob: {
       async filter(query, sort, limit) {
         let jobs = getJobs();
-        if (query?.user_email) {
-          jobs = jobs.filter((j) => j.user_email === query.user_email);
-        }
-        if (query?.id) {
-          jobs = jobs.filter((j) => j.id === query.id);
-        }
+        if (query?.user_email) jobs = jobs.filter((j) => j.user_email === query.user_email);
+        if (query?.id) jobs = jobs.filter((j) => j.id === query.id);
         return jobs.slice(0, limit || 100);
       },
       async create(data) {
-        const job = {
-          id: generateId(),
-          created_date: new Date().toISOString(),
-          ...data,
-        };
+        const job = { id: generateId(), created_date: new Date().toISOString(), ...data };
         saveJob(job);
         return job;
       },
@@ -233,19 +372,19 @@ export const base44 = {
   functions: {
     async invoke(name, args) {
       if (name === 'stageImage') {
-        // Fire-and-forget: resolves in background after delay
-        simulateStaging(args.jobId);
+        // Fire-and-forget — resolves in background (real or mock)
+        stageJob(args.jobId);
       }
-      // Other functions (smartPick, createCheckoutSession, etc.) are no-ops in mock
     },
   },
 
   integrations: {
     Core: {
       async UploadFile({ file }) {
-        // Blob URLs work for the session — images won't persist after refresh.
-        // Replace with real file upload (S3, Cloudinary, etc.) when going live.
-        return { file_url: URL.createObjectURL(file) };
+        const blobUrl = URL.createObjectURL(file);
+        // Store the File object so the staging function can access it later
+        fileStore.set(blobUrl, file);
+        return { file_url: blobUrl };
       },
     },
   },
