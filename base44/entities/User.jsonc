@@ -1,0 +1,53 @@
+{
+  "name": "User",
+  "type": "object",
+  "properties": {
+    "role": {
+      "type": "string",
+      "enum": [
+        "admin",
+        "user"
+      ],
+      "default": "user"
+    },
+    "subscription_plan": {
+      "type": "string",
+      "enum": [
+        "none",
+        "starter",
+        "agent",
+        "pro"
+      ],
+      "default": "none"
+    },
+    "subscription_status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "cancelled",
+        "past_due",
+        "trialing",
+        "none"
+      ],
+      "default": "none"
+    },
+    "stripe_customer_id": {
+      "type": "string"
+    },
+    "stripe_subscription_id": {
+      "type": "string"
+    },
+    "generations_used": {
+      "type": "number",
+      "default": 0
+    },
+    "generations_limit": {
+      "type": "number",
+      "default": 0
+    },
+    "billing_period_start": {
+      "type": "string",
+      "format": "date"
+    }
+  }
+}

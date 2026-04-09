@@ -1,0 +1,82 @@
+{
+  "name": "StagingJob",
+  "type": "object",
+  "properties": {
+    "user_email": {
+      "type": "string"
+    },
+    "property_address": {
+      "type": "string"
+    },
+    "listing_price": {
+      "type": "string"
+    },
+    "room_type": {
+      "type": "string",
+      "enum": [
+        "living_room",
+        "bedroom",
+        "dining_room",
+        "kitchen",
+        "office",
+        "bathroom",
+        "outdoor",
+        "other"
+      ]
+    },
+    "decor_style": {
+      "type": "string",
+      "enum": [
+        "modern",
+        "farmhouse",
+        "coastal",
+        "traditional",
+        "mid_century",
+        "scandinavian",
+        "transitional",
+        "smart_pick"
+      ]
+    },
+    "decor_level": {
+      "type": "string",
+      "enum": [
+        "light",
+        "medium",
+        "full"
+      ],
+      "default": "medium"
+    },
+    "original_image_url": {
+      "type": "string"
+    },
+    "staged_image_url": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "processing",
+        "completed",
+        "failed"
+      ],
+      "default": "pending"
+    },
+    "batch_id": {
+      "type": "string"
+    },
+    "smart_pick_reasoning": {
+      "type": "string"
+    },
+    "error_message": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "user_email",
+    "room_type",
+    "decor_style",
+    "decor_level",
+    "original_image_url"
+  ]
+}
