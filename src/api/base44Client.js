@@ -94,31 +94,16 @@ LIGHTING & ATMOSPHERE:
 - The room's existing natural and artificial lighting must remain unchanged
 - DO NOT adjust brightness, contrast, exposure, saturation, or color temperature of the room
 - DO NOT add ambient light, fill light, or HDR enhancement to the space
-- DO NOT change how bright or dark the overall room appears
+- Only add cast shadows directly beneath furniture you place, matched to the existing light direction
 
 ═══════════════════════════════════════
 WHAT YOU ARE ALLOWED TO ADD
 ═══════════════════════════════════════
 - Freestanding furniture placed on visible floor areas (sofas, chairs, tables, beds, bookshelves)
 - A single area rug placed under/beneath furniture groupings
-- Small accessories placed on top of furniture you added (plants, books, vases, bowls, art leaned against walls)
-- Table lamps and floor lamps may be added as accessories — they MUST be turned ON. Every lamp placed must show a warm, soft glow emanating through the lampshade as if the bulb is lit. No unlit lamps.
+- Small accessories placed on top of furniture you added (lamps, plants, books, vases, bowls, art leaned against walls)
 - All additions must match the room's existing perspective, lighting, and scale exactly
-- The final image must be photorealistic — indistinguishable from a professional real estate photograph
-
-FURNITURE QUALITY REQUIREMENTS:
-- Every piece of furniture must be fully photorealistic — crisp, sharp edges with no blurring, distortion, or soft rendering artifacts
-- All furniture must follow the room's exact perspective and vanishing points — legs, arms, and backs must be geometrically accurate
-- Upholstered pieces must show natural fabric weight, folds, and texture
-- Chair and sofa legs must be fully formed, four-legged, and correctly foreshortened in perspective
-- No furniture may appear partially melted, warped, merged with the floor, or have missing limbs
-
-SHADOW REQUIREMENTS:
-- Every piece of furniture must cast a soft, directional shadow on the floor directly beneath and behind it
-- Shadow direction and angle must be consistent across ALL furniture in the scene, matching the existing window light source
-- Shadow softness must match the existing ambient shadows visible in the original photo (look at the baseboard shadows for reference)
-- Furniture legs must cast individual, correctly sized ground contact shadows
-- Area rug edges must have a subtle shadow where they meet the floor
+- The final image must be photorealistic — indistinguishable from a real photograph
 
 ═══════════════════════════════════════
 STAGING REQUIREMENTS
