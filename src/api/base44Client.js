@@ -246,33 +246,31 @@ async function toPngFile(file) {
 }
 
 // ---------------------------------------------------------------------------
-// Structure compositing — restores original floor, windows, and walls
-// after AI staging, ensuring the room's bones are pixel-perfect preserved.
+// Floor perimeter compositing
 //
-// How it works:
-//   1. Floor zone (bottom 50%): compares each pixel between original and AI.
-//      - Small color change = floor was just recolored → restore original pixel
-//      - Large color change = furniture was added → keep AI pixel
-//   2. Bright/overexposed areas (full image): if the original had a blown-out
-//      window or bright wall and the AI "improved" it with trees/sky/color,
-//      restore the original pixels.
-//   3. Transition zone (40–50% from top): soft blend to avoid a hard seam.
+// The previous approach (full pixel comparison) was too aggressive — it was
+// wiping out white/light furniture against white walls because their color
+// distance was below the threshold.
 //
-// Thresholds (color distance 0–441):
-//   FLOOR_FURNITURE_THRESHOLD — below this = floor recoloring, restore original
-//                              above this = furniture added, keep AI
-//   BRIGHT_RESTORE_THRESHOLD  — how much the AI can change a bright/overexposed
-//                              pixel before we restore it (catches window edits)
+// This safer version only restores two zones where furniture NEVER sits:
+//
+//   1. Bottom strip (bottom 12% of image): the baseboard-to-floor area.
+//      Furniture legs touch this zone but never fully cover it edge-to-edge.
+//      We do a full restore here — this is where floor recoloring is most
+//      visible and least likely to conflict with furniture.
+//
+//   2. Soft blend zone (12–22% from bottom): gradual transition upward
+//      from full restore to zero restore, so there's no hard seam.
+//
+// Windows are handled by the prompt only. The compositor no longer touches
+// bright areas — that was causing white furniture to get erased.
 // ---------------------------------------------------------------------------
-const FLOOR_FURNITURE_THRESHOLD = 80; // tune if furniture is being incorrectly erased
-const BRIGHT_RESTORE_THRESHOLD  = 40; // tune if windows are still being changed
-
 async function compositeStructure(originalFile, stagedBlobUrl) {
   return new Promise((resolve, reject) => {
-    const origUrl = URL.createObjectURL(originalFile);
-    const origImg = new Image();
+    const origUrl  = URL.createObjectURL(originalFile);
+    const origImg  = new Image();
     const stageImg = new Image();
-    let origLoaded = false;
+    let origLoaded  = false;
     let stageLoaded = false;
 
     const run = () => {
@@ -282,68 +280,39 @@ async function compositeStructure(originalFile, stagedBlobUrl) {
         const h = stageImg.naturalHeight;
 
         const canvas = document.createElement('canvas');
-        canvas.width = w;
+        canvas.width  = w;
         canvas.height = h;
         const ctx = canvas.getContext('2d');
 
-        // Get AI staged pixels
+        // Read AI staged pixels
         ctx.drawImage(stageImg, 0, 0, w, h);
         const stagedPixels = ctx.getImageData(0, 0, w, h);
 
-        // Get original pixels scaled to match the AI output dimensions
+        // Read original pixels, scaled to same dimensions as AI output
         ctx.drawImage(origImg, 0, 0, w, h);
         const origPixels = ctx.getImageData(0, 0, w, h);
 
-        const ai   = stagedPixels.data; // will be modified in place
+        const ai   = stagedPixels.data; // modified in place
         const orig = origPixels.data;
 
-        // Zone boundaries (in pixels from top)
-        const transitionStart = Math.floor(h * 0.40); // blend starts here
-        const floorStart      = Math.floor(h * 0.50); // full floor restoration from here
+        // Zone boundaries (measured from the BOTTOM of the image)
+        const hardRestoreFrom  = Math.floor(h * 0.88); // bottom 12%: full restore
+        const blendRestoreFrom = Math.floor(h * 0.78); // 12–22% from bottom: blend
 
-        for (let y = 0; y < h; y++) {
+        for (let y = blendRestoreFrom; y < h; y++) {
+          // strength = 1.0 at very bottom, fades to 0.0 at blend start
+          let strength;
+          if (y >= hardRestoreFrom) {
+            strength = 1.0;
+          } else {
+            strength = (y - blendRestoreFrom) / (hardRestoreFrom - blendRestoreFrom);
+          }
+
           for (let x = 0; x < w; x++) {
             const i = (y * w + x) * 4;
-
-            const aiR = ai[i], aiG = ai[i+1], aiB = ai[i+2];
-            const orR = orig[i], orG = orig[i+1], orB = orig[i+2];
-
-            // Euclidean color distance between original and AI at this pixel
-            const dist = Math.sqrt(
-              (aiR - orR) ** 2 +
-              (aiG - orG) ** 2 +
-              (aiB - orB) ** 2
-            );
-
-            // ── Bright/overexposed area restoration (full image) ──────────────
-            // If the original pixel was near-white (blown-out window, bright wall)
-            // and the AI changed it noticeably, restore the original.
-            const origBrightness = (orR + orG + orB) / 3;
-            if (origBrightness > 210 && dist > BRIGHT_RESTORE_THRESHOLD) {
-              ai[i]   = orR;
-              ai[i+1] = orG;
-              ai[i+2] = orB;
-              continue; // no further processing needed for this pixel
-            }
-
-            // ── Floor zone restoration (lower portion of image) ───────────────
-            if (y >= transitionStart) {
-              const isFloorRecolor = dist < FLOOR_FURNITURE_THRESHOLD;
-
-              if (isFloorRecolor) {
-                // Small color change = floor was just recolored. Restore original.
-                // In the transition zone, blend gradually to avoid a hard seam.
-                let restoreStrength = 1.0;
-                if (y < floorStart) {
-                  restoreStrength = (y - transitionStart) / (floorStart - transitionStart);
-                }
-
-                ai[i]   = Math.round(orR * restoreStrength + aiR * (1 - restoreStrength));
-                ai[i+1] = Math.round(orG * restoreStrength + aiG * (1 - restoreStrength));
-                ai[i+2] = Math.round(orB * restoreStrength + aiB * (1 - restoreStrength));
-              }
-              // Large color change = furniture was added. Keep AI pixel as-is.
-            }
+            ai[i]   = Math.round(orig[i]   * strength + ai[i]   * (1 - strength));
+            ai[i+1] = Math.round(orig[i+1] * strength + ai[i+1] * (1 - strength));
+            ai[i+2] = Math.round(orig[i+2] * strength + ai[i+2] * (1 - strength));
           }
         }
 
@@ -361,9 +330,9 @@ async function compositeStructure(originalFile, stagedBlobUrl) {
       }
     };
 
-    origImg.onload  = () => { origLoaded  = true; run(); };
-    stageImg.onload = () => { stageLoaded = true; run(); };
-    origImg.onerror  = () => reject(new Error('Compositing: failed to load original image'));
+    origImg.onload   = () => { origLoaded  = true; run(); };
+    stageImg.onload  = () => { stageLoaded = true; run(); };
+    origImg.onerror  = () => reject(new Error('Compositing: failed to load original'));
     stageImg.onerror = () => reject(new Error('Compositing: failed to load staged image'));
 
     origImg.src  = origUrl;
