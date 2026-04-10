@@ -16,7 +16,9 @@
  */
 
 // ---------------------------------------------------------------------------
-// Prompts — tuned through extensive testing, do not modify lightly
+// Prompts
+// Two prompt sets: one for OpenAI (needs wall/floor preservation rules),
+// one for Flux Fill (mask handles preservation — prompt can focus on furniture)
 // ---------------------------------------------------------------------------
 const ROOM_PROMPTS = {
   living_room: 'living room with sofa, coffee table, accent chairs, area rug, and decorative accessories',
@@ -45,6 +47,17 @@ const LEVEL_DESCRIPTORS = {
   full: 'Fully stage the room with complete furniture arrangement, layered textiles, art, plants, and rich accessories. Lush and complete.',
 };
 
+// Flux Fill prompt — short and furniture-focused.
+// The mask handles wall/ceiling/window preservation, so no defensive rules needed.
+function buildFluxPrompt(roomType, decorStyle, decorLevel) {
+  const roomDesc = ROOM_PROMPTS[roomType] || ROOM_PROMPTS.other;
+  const styleDesc = STYLE_DESCRIPTORS[decorStyle] || STYLE_DESCRIPTORS.transitional;
+  const levelDesc = LEVEL_DESCRIPTORS[decorLevel] || LEVEL_DESCRIPTORS.medium;
+
+  return `Photorealistic interior design photograph. ${styleDesc}. Furnished ${roomDesc}. ${levelDesc}. Furniture has correct perspective and scale for the room, crisp sharp edges, soft directional shadows on the floor. Professional real estate photography. Natural lighting.`;
+}
+
+// OpenAI prompt — verbose with preservation rules since gpt-image-1 regenerates the whole scene.
 function buildStagingPrompt(roomType, decorStyle, decorLevel) {
   const roomDesc = ROOM_PROMPTS[roomType] || ROOM_PROMPTS.other;
   const styleDesc = STYLE_DESCRIPTORS[decorStyle] || STYLE_DESCRIPTORS.transitional;
@@ -246,6 +259,150 @@ async function toPngFile(file) {
 }
 
 // ---------------------------------------------------------------------------
+// Replicate helpers
+// ---------------------------------------------------------------------------
+
+// Convert a File to a base64 data URI (required since blob URLs aren't public)
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error('Failed to read file as data URL'));
+    reader.readAsDataURL(file);
+  });
+}
+
+// Get pixel dimensions of a File without drawing to a visible canvas
+function getImageDimensions(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => { URL.revokeObjectURL(url); resolve({ width: img.naturalWidth, height: img.naturalHeight }); };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Failed to load image for dimensions')); };
+    img.src = url;
+  });
+}
+
+// Generate the inpaint mask:
+//   Black (0,0,0)   = preserve — ceiling, upper walls, windows
+//   White (255,255,255) = inpaint — furniture zone (lower portion of room)
+//
+// Zone layout:
+//   0–28%  of height  → solid black (ceiling + top of walls)
+//   28–45% of height  → gradient black→white (smooth transition at wall/floor boundary)
+//   45–100% of height → solid white (full furniture zone)
+async function generateInpaintMask(width, height) {
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+
+  const transStart = Math.floor(height * 0.28);
+  const transEnd   = Math.floor(height * 0.45);
+
+  // Top zone — fully black (preserve)
+  ctx.fillStyle = '#000000';
+  ctx.fillRect(0, 0, width, transStart);
+
+  // Transition zone — gradient black to white
+  const grad = ctx.createLinearGradient(0, transStart, 0, transEnd);
+  grad.addColorStop(0, 'black');
+  grad.addColorStop(1, 'white');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, transStart, width, transEnd - transStart);
+
+  // Furniture zone — fully white (inpaint)
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, transEnd, width, height - transEnd);
+
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (!blob) return reject(new Error('Failed to generate mask'));
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    }, 'image/png');
+  });
+}
+
+// Fetch a Replicate output URL and return a local blob URL
+async function replicateOutputToBlob(url) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Failed to fetch Replicate output: ${res.status}`);
+  const blob = await res.blob();
+  return URL.createObjectURL(blob);
+}
+
+// Call Flux Fill Pro on Replicate, poll until done, return a local blob URL
+async function runReplicateStaging(job) {
+  const apiKey = import.meta.env.VITE_REPLICATE_API_KEY;
+
+  const originalFile = fileStore.get(job.original_image_url);
+  if (!originalFile) throw new Error('Original photo not found in session. Please re-upload and try again.');
+
+  // Convert to PNG → base64 data URI (Replicate needs a public URL or data URI)
+  const pngFile   = await toPngFile(originalFile);
+  const imageData = await fileToDataUrl(pngFile);
+
+  // Build mask matching the image dimensions
+  const { width, height } = await getImageDimensions(pngFile);
+  const maskData = await generateInpaintMask(width, height);
+
+  const prompt = buildFluxPrompt(job.room_type, job.decor_style, job.decor_level);
+
+  // Create prediction — use Prefer: wait=60 for fast sync response when possible
+  const createRes = await fetch('https://api.replicate.com/v1/models/black-forest-labs/flux-fill-pro/predictions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+      'Prefer': 'wait=60',
+    },
+    body: JSON.stringify({
+      input: {
+        image: imageData,
+        mask: maskData,
+        prompt,
+        steps: 50,
+        guidance: 60,
+        output_format: 'png',
+        safety_tolerance: 6,
+      },
+    }),
+  });
+
+  let prediction = await createRes.json();
+  if (!createRes.ok) {
+    throw new Error(prediction.detail || `Replicate error ${createRes.status}`);
+  }
+
+  // If sync response already completed, return immediately
+  if (prediction.status === 'succeeded') {
+    return replicateOutputToBlob(prediction.output);
+  }
+
+  // Otherwise poll every 3 seconds (max ~3 minutes)
+  const pollUrl = `https://api.replicate.com/v1/predictions/${prediction.id}`;
+  for (let i = 0; i < 60; i++) {
+    await new Promise((r) => setTimeout(r, 3000));
+    const pollRes = await fetch(pollUrl, {
+      headers: { 'Authorization': `Bearer ${apiKey}` },
+    });
+    prediction = await pollRes.json();
+
+    if (prediction.status === 'succeeded') {
+      return replicateOutputToBlob(prediction.output);
+    }
+    if (prediction.status === 'failed' || prediction.status === 'canceled') {
+      throw new Error(`Replicate prediction ${prediction.status}: ${prediction.error || 'unknown'}`);
+    }
+  }
+
+  throw new Error('Replicate timed out after 3 minutes');
+}
+
+// ---------------------------------------------------------------------------
 // Floor compositing — color-distance based, floor zone only
 //
 // Approach:
@@ -433,17 +590,23 @@ async function stageJob(jobId) {
   const job = jobs.find((j) => j.id === jobId);
   if (!job) return;
 
-  const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
+  const replicateKey = import.meta.env.VITE_REPLICATE_API_KEY;
+  const openaiKey    = import.meta.env.VITE_OPENAI_API_KEY;
 
   try {
     let stagedImageUrl;
 
-    if (apiKey) {
-      // Real AI mode
+    if (replicateKey) {
+      // Replicate Flux Fill Pro — true inpainting with mask (best quality + room preservation)
+      console.info('[Listing Lift] Using Replicate Flux Fill Pro');
+      stagedImageUrl = await runReplicateStaging(job);
+    } else if (openaiKey) {
+      // OpenAI gpt-image-1 — generative with post-processing compositing
+      console.info('[Listing Lift] Using OpenAI gpt-image-1 (add VITE_REPLICATE_API_KEY for better results)');
       stagedImageUrl = await runAiStaging(job);
     } else {
-      // Mock mode — no API key configured
-      console.info('[Listing Lift] No VITE_OPENAI_API_KEY found — using mock staging. Add your key to .env to enable real AI.');
+      // Mock mode
+      console.info('[Listing Lift] No API key found — using mock staging.');
       stagedImageUrl = await runMockStaging(job);
     }
 
