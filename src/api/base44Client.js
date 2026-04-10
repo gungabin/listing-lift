@@ -246,25 +246,34 @@ async function toPngFile(file) {
 }
 
 // ---------------------------------------------------------------------------
-// Floor perimeter compositing
+// Floor compositing — color-distance based, floor zone only
 //
-// The previous approach (full pixel comparison) was too aggressive — it was
-// wiping out white/light furniture against white walls because their color
-// distance was below the threshold.
+// Approach:
+//   In the bottom 55% of the image (where the floor lives), compare each
+//   pixel between the original and AI output using Euclidean color distance:
 //
-// This safer version only restores two zones where furniture NEVER sits:
+//   - SMALL distance (< threshold): the AI just recolored this pixel.
+//     The original wood floor got stained/darkened/lightened. Restore it.
 //
-//   1. Bottom strip (bottom 12% of image): the baseboard-to-floor area.
-//      Furniture legs touch this zone but never fully cover it edge-to-edge.
-//      We do a full restore here — this is where floor recoloring is most
-//      visible and least likely to conflict with furniture.
+//   - LARGE distance (≥ threshold): something physically different is here —
+//     a rug, furniture leg, or shadow. Keep the AI pixel.
 //
-//   2. Soft blend zone (12–22% from bottom): gradual transition upward
-//      from full restore to zero restore, so there's no hard seam.
+// Why color distance works in the floor zone but NOT elsewhere:
+//   In the wall/ceiling zone, the original is white and furniture is also
+//   white/light — small distance, would erase furniture. Bad.
+//   In the floor zone, the original is wood-colored. A rug or furniture leg
+//   on top of wood = very large color distance. Safe to threshold.
 //
-// Windows are handled by the prompt only. The compositor no longer touches
-// bright areas — that was causing white furniture to get erased.
+// Transition zone (45–55% from top): soft blend to avoid a hard seam
+// at the wall/floor boundary.
+//
+// Threshold tuning:
+//   Too low  → floor still changes (AI recoloring not caught)
+//   Too high → rug/furniture starts getting erased
+//   ~55 works well for typical wood floors. Adjust if needed.
 // ---------------------------------------------------------------------------
+const FLOOR_THRESHOLD = 55;
+
 async function compositeStructure(originalFile, stagedBlobUrl) {
   return new Promise((resolve, reject) => {
     const origUrl  = URL.createObjectURL(originalFile);
@@ -288,31 +297,41 @@ async function compositeStructure(originalFile, stagedBlobUrl) {
         ctx.drawImage(stageImg, 0, 0, w, h);
         const stagedPixels = ctx.getImageData(0, 0, w, h);
 
-        // Read original pixels, scaled to same dimensions as AI output
+        // Read original pixels scaled to match AI output dimensions
         ctx.drawImage(origImg, 0, 0, w, h);
         const origPixels = ctx.getImageData(0, 0, w, h);
 
         const ai   = stagedPixels.data; // modified in place
         const orig = origPixels.data;
 
-        // Zone boundaries (measured from the BOTTOM of the image)
-        const hardRestoreFrom  = Math.floor(h * 0.88); // bottom 12%: full restore
-        const blendRestoreFrom = Math.floor(h * 0.78); // 12–22% from bottom: blend
+        // Zone boundaries (from top of image)
+        const blendStart = Math.floor(h * 0.45); // transition zone begins
+        const floorStart = Math.floor(h * 0.55); // full floor zone begins
 
-        for (let y = blendRestoreFrom; y < h; y++) {
-          // strength = 1.0 at very bottom, fades to 0.0 at blend start
-          let strength;
-          if (y >= hardRestoreFrom) {
-            strength = 1.0;
-          } else {
-            strength = (y - blendRestoreFrom) / (hardRestoreFrom - blendRestoreFrom);
-          }
+        for (let y = blendStart; y < h; y++) {
+          // How strongly to apply restoration in the transition zone.
+          // 0.0 at blend start → 1.0 at floor start → 1.0 for rest of image.
+          const zoneStrength = y < floorStart
+            ? (y - blendStart) / (floorStart - blendStart)
+            : 1.0;
 
           for (let x = 0; x < w; x++) {
             const i = (y * w + x) * 4;
-            ai[i]   = Math.round(orig[i]   * strength + ai[i]   * (1 - strength));
-            ai[i+1] = Math.round(orig[i+1] * strength + ai[i+1] * (1 - strength));
-            ai[i+2] = Math.round(orig[i+2] * strength + ai[i+2] * (1 - strength));
+
+            const aiR = ai[i],   aiG = ai[i+1], aiB = ai[i+2];
+            const orR = orig[i], orG = orig[i+1], orB = orig[i+2];
+
+            // Euclidean color distance between original and AI at this pixel
+            const dist = Math.sqrt((aiR-orR)**2 + (aiG-orG)**2 + (aiB-orB)**2);
+
+            // Only restore if the change is small (floor recoloring, not furniture)
+            if (dist < FLOOR_THRESHOLD) {
+              const s = zoneStrength;
+              ai[i]   = Math.round(orR * s + aiR * (1 - s));
+              ai[i+1] = Math.round(orG * s + aiG * (1 - s));
+              ai[i+2] = Math.round(orB * s + aiB * (1 - s));
+            }
+            // Large distance = rug, furniture leg, or shadow → keep AI pixel
           }
         }
 
