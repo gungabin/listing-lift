@@ -246,7 +246,133 @@ async function toPngFile(file) {
 }
 
 // ---------------------------------------------------------------------------
-// Real AI staging — calls OpenAI gpt-image-1
+// Structure compositing — restores original floor, windows, and walls
+// after AI staging, ensuring the room's bones are pixel-perfect preserved.
+//
+// How it works:
+//   1. Floor zone (bottom 50%): compares each pixel between original and AI.
+//      - Small color change = floor was just recolored → restore original pixel
+//      - Large color change = furniture was added → keep AI pixel
+//   2. Bright/overexposed areas (full image): if the original had a blown-out
+//      window or bright wall and the AI "improved" it with trees/sky/color,
+//      restore the original pixels.
+//   3. Transition zone (40–50% from top): soft blend to avoid a hard seam.
+//
+// Thresholds (color distance 0–441):
+//   FLOOR_FURNITURE_THRESHOLD — below this = floor recoloring, restore original
+//                              above this = furniture added, keep AI
+//   BRIGHT_RESTORE_THRESHOLD  — how much the AI can change a bright/overexposed
+//                              pixel before we restore it (catches window edits)
+// ---------------------------------------------------------------------------
+const FLOOR_FURNITURE_THRESHOLD = 80; // tune if furniture is being incorrectly erased
+const BRIGHT_RESTORE_THRESHOLD  = 40; // tune if windows are still being changed
+
+async function compositeStructure(originalFile, stagedBlobUrl) {
+  return new Promise((resolve, reject) => {
+    const origUrl = URL.createObjectURL(originalFile);
+    const origImg = new Image();
+    const stageImg = new Image();
+    let origLoaded = false;
+    let stageLoaded = false;
+
+    const run = () => {
+      if (!origLoaded || !stageLoaded) return;
+      try {
+        const w = stageImg.naturalWidth;
+        const h = stageImg.naturalHeight;
+
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+
+        // Get AI staged pixels
+        ctx.drawImage(stageImg, 0, 0, w, h);
+        const stagedPixels = ctx.getImageData(0, 0, w, h);
+
+        // Get original pixels scaled to match the AI output dimensions
+        ctx.drawImage(origImg, 0, 0, w, h);
+        const origPixels = ctx.getImageData(0, 0, w, h);
+
+        const ai   = stagedPixels.data; // will be modified in place
+        const orig = origPixels.data;
+
+        // Zone boundaries (in pixels from top)
+        const transitionStart = Math.floor(h * 0.40); // blend starts here
+        const floorStart      = Math.floor(h * 0.50); // full floor restoration from here
+
+        for (let y = 0; y < h; y++) {
+          for (let x = 0; x < w; x++) {
+            const i = (y * w + x) * 4;
+
+            const aiR = ai[i], aiG = ai[i+1], aiB = ai[i+2];
+            const orR = orig[i], orG = orig[i+1], orB = orig[i+2];
+
+            // Euclidean color distance between original and AI at this pixel
+            const dist = Math.sqrt(
+              (aiR - orR) ** 2 +
+              (aiG - orG) ** 2 +
+              (aiB - orB) ** 2
+            );
+
+            // ── Bright/overexposed area restoration (full image) ──────────────
+            // If the original pixel was near-white (blown-out window, bright wall)
+            // and the AI changed it noticeably, restore the original.
+            const origBrightness = (orR + orG + orB) / 3;
+            if (origBrightness > 210 && dist > BRIGHT_RESTORE_THRESHOLD) {
+              ai[i]   = orR;
+              ai[i+1] = orG;
+              ai[i+2] = orB;
+              continue; // no further processing needed for this pixel
+            }
+
+            // ── Floor zone restoration (lower portion of image) ───────────────
+            if (y >= transitionStart) {
+              const isFloorRecolor = dist < FLOOR_FURNITURE_THRESHOLD;
+
+              if (isFloorRecolor) {
+                // Small color change = floor was just recolored. Restore original.
+                // In the transition zone, blend gradually to avoid a hard seam.
+                let restoreStrength = 1.0;
+                if (y < floorStart) {
+                  restoreStrength = (y - transitionStart) / (floorStart - transitionStart);
+                }
+
+                ai[i]   = Math.round(orR * restoreStrength + aiR * (1 - restoreStrength));
+                ai[i+1] = Math.round(orG * restoreStrength + aiG * (1 - restoreStrength));
+                ai[i+2] = Math.round(orB * restoreStrength + aiB * (1 - restoreStrength));
+              }
+              // Large color change = furniture was added. Keep AI pixel as-is.
+            }
+          }
+        }
+
+        ctx.putImageData(stagedPixels, 0, 0);
+        URL.revokeObjectURL(origUrl);
+
+        canvas.toBlob((blob) => {
+          if (!blob) return reject(new Error('Structure compositing failed'));
+          resolve(URL.createObjectURL(blob));
+        }, 'image/png');
+
+      } catch (err) {
+        URL.revokeObjectURL(origUrl);
+        reject(err);
+      }
+    };
+
+    origImg.onload  = () => { origLoaded  = true; run(); };
+    stageImg.onload = () => { stageLoaded = true; run(); };
+    origImg.onerror  = () => reject(new Error('Compositing: failed to load original image'));
+    stageImg.onerror = () => reject(new Error('Compositing: failed to load staged image'));
+
+    origImg.src  = origUrl;
+    stageImg.src = stagedBlobUrl;
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Real AI staging — calls OpenAI gpt-image-1, then composites structure back
 // ---------------------------------------------------------------------------
 async function runAiStaging(job) {
   const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
@@ -285,12 +411,17 @@ async function runAiStaging(job) {
   const b64 = data.data?.[0]?.b64_json;
   if (!b64) throw new Error('No image returned from OpenAI');
 
-  // Decode base64 → blob URL so we can display it
+  // Decode base64 → blob URL
   const binaryStr = atob(b64);
   const bytes = new Uint8Array(binaryStr.length);
   for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
-  const blob = new Blob([bytes], { type: 'image/png' });
-  return URL.createObjectURL(blob);
+  const aiBlob = new Blob([bytes], { type: 'image/png' });
+  const aiUrl  = URL.createObjectURL(aiBlob);
+
+  // Composite: restore original floor, windows, and bright structural elements
+  const compositedUrl = await compositeStructure(originalFile, aiUrl);
+  URL.revokeObjectURL(aiUrl); // clean up the intermediate blob
+  return compositedUrl;
 }
 
 // ---------------------------------------------------------------------------
