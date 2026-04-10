@@ -50,44 +50,69 @@ function buildStagingPrompt(roomType, decorStyle, decorLevel) {
   const styleDesc = STYLE_DESCRIPTORS[decorStyle] || STYLE_DESCRIPTORS.transitional;
   const levelDesc = LEVEL_DESCRIPTORS[decorLevel] || LEVEL_DESCRIPTORS.medium;
 
-  return `You are a professional virtual home stager. Your ONLY job is to place freestanding furniture and small accessories into the empty floor space of this room photo. Think of it as placing physical objects into the room — nothing else changes.
+  return `This is a real estate photograph of an empty room. Your ONLY task is to place freestanding furniture and accessories into the empty space. You are adding objects to a photograph — nothing about the photograph itself changes. Every pixel not covered by furniture you add must be 100% identical to the original image.
 
-ABSOLUTE PROHIBITIONS — violating any of these is a critical failure:
+═══════════════════════════════════════
+PRESERVATION RULES — READ THESE FIRST
+These are absolute. Violating any one is a complete failure.
+═══════════════════════════════════════
 
-WINDOWS & OUTSIDE:
-- The view through every window must be preserved with 100% pixel accuracy — same trees, same sky, same buildings, same colors, same lighting outside
-- DO NOT add, remove, or change curtains, blinds, shutters, or any window treatments
-- DO NOT alter window frames, glass, or anything seen through the glass
+FLOOR — MOST CRITICAL:
+The floor is a fixed, permanent feature of this property. It must appear exactly as it does in the original photograph in every area not directly covered by furniture you place.
+- DO NOT change the floor color, stain, tone, or finish in any way
+- DO NOT lighten, darken, warm, cool, or recolor the flooring
+- DO NOT change the wood species, plank width, grain pattern, or texture
+- DO NOT add sheen, gloss, or polish that does not exist in the original
+- DO NOT blur, sharpen, or alter the floor surface in any way
+- Floor visible around furniture legs, between pieces, and at room edges must be pixel-perfect identical to the original
+- If the original floor looks raw, unfinished, or light in tone — it must remain exactly that way
 
-WALLS, FLOORS & STRUCTURE:
-- DO NOT change wall color, texture, paint, paneling, shiplap, wallpaper, or any wall surface
-- DO NOT change flooring material, color, pattern, or texture
-- DO NOT alter ceiling, crown molding, baseboards, or any architectural trim
-- DO NOT add, remove, or change doors or door frames
+WINDOWS & EXTERIOR VIEW:
+- Every window must look exactly as it does in the original — same frame, same glass, same exterior view
+- If the exterior view is overexposed, blown out, bright white, or partially visible — it must remain that way. DO NOT add trees, sky, foliage, buildings, or any scenery not clearly present in the original
+- DO NOT add curtains, blinds, drapes, shutters, or any window treatments of any kind
+- DO NOT alter window frames, glass reflections, or mullions
 
-FIXED ROOM FEATURES — every item below must remain exactly as it appears in the original photo:
-- Every electrical outlet, wall plate, coax plate, ethernet plate, USB plate — preserve the exact type and appearance
-- Every light switch and switch plate
-- Every HVAC vent, air return, diffuser
-- Every smoke detector, carbon monoxide detector, sprinkler head
-- Every thermostat, keypad, or wall-mounted device
-- Every built-in fixture, recessed light, ceiling fan
-- If any of these items would be hidden behind furniture you are placing, you may place the furniture in front — but never alter the item itself
+WALLS:
+- Wall color, paint, texture, paneling, wainscoting, board-and-batten, shiplap, millwork, wallpaper — must be pixel-perfect identical to the original
+- DO NOT alter, enhance, brighten, or "improve" any wall surface
 
-LIGHTING:
-- DO NOT change the existing light, shadow, or exposure of the room
-- Only add shadows cast by new furniture items you place, consistent with existing light direction
+CEILING:
+- Ceiling color, texture, coffered details, tray ceiling profiles, beams, crown molding — must be pixel-perfect identical to the original
+- DO NOT alter, lighten, or enhance the ceiling in any way
 
-YOU MAY ONLY:
-- Place freestanding furniture on the floor (sofas, chairs, tables, beds, rugs, bookshelves)
-- Place small accessories on top of furniture you added (lamps, plants, books, vases, bowls)
-- Everything you add must match the room's existing perspective, scale, and lighting exactly
-- The final result must look like a real photograph with furniture added — not a rendering or illustration
+FIXED FIXTURES — every one of these must remain exactly as photographed:
+- Recessed lights, can lights, ceiling fans, chandeliers, pendants, sconces
+- HVAC vents, air returns, grilles, diffusers — exact appearance preserved
+- Electrical outlets, switch plates, wall plates, coax plates, ethernet plates
+- Smoke detectors, carbon monoxide detectors, sprinkler heads
+- Thermostats, keypads, wall-mounted devices
+- Baseboards, door frames, doors, built-in shelving, fireplaces, built-in cabinetry
+- If furniture would overlap a fixture, you may place furniture in front — but never alter the fixture itself
 
-STAGING REQUIREMENTS:
-- Room: ${roomDesc}
-- Style: ${styleDesc}
-- Density: ${levelDesc}`;
+LIGHTING & ATMOSPHERE:
+- The room's existing natural and artificial lighting must remain unchanged
+- DO NOT adjust brightness, contrast, exposure, saturation, or color temperature of the room
+- DO NOT add ambient light, fill light, or HDR enhancement to the space
+- Only add cast shadows directly beneath furniture you place, matched to the existing light direction
+
+═══════════════════════════════════════
+WHAT YOU ARE ALLOWED TO ADD
+═══════════════════════════════════════
+- Freestanding furniture placed on visible floor areas (sofas, chairs, tables, beds, bookshelves)
+- A single area rug placed under/beneath furniture groupings
+- Small accessories placed on top of furniture you added (lamps, plants, books, vases, bowls, art leaned against walls)
+- All additions must match the room's existing perspective, lighting, and scale exactly
+- The final image must be photorealistic — indistinguishable from a real photograph
+
+═══════════════════════════════════════
+STAGING REQUIREMENTS
+═══════════════════════════════════════
+Room: ${roomDesc}
+Style: ${styleDesc}
+Density: ${levelDesc}
+
+FINAL CHECK: Before finishing, verify — do the floors, walls, ceiling, windows, and all fixtures look exactly as they did in the original photo? If anything structural has changed, that is a failure. Undo it.`;
 }
 
 // ---------------------------------------------------------------------------
