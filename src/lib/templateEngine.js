@@ -1,10 +1,18 @@
 /**
  * templateEngine.js
  * Loads room layout templates and resolves piece positions into floor coordinates.
+ *
+ * Templates are imported as ES modules (not fetched) so Vite bundles them.
+ * Files in /src/data/ are not served statically — only /public/ is.
  */
 
-// Cache loaded templates to avoid redundant fetches
-const templateCache = new Map();
+import livingRoomTemplate from '@/data/templates/living_room.json';
+import bedroomTemplate    from '@/data/templates/bedroom.json';
+
+const TEMPLATES = {
+  living_room: livingRoomTemplate,
+  bedroom:     bedroomTemplate,
+};
 
 /**
  * Load and return the best layout for a given room type and furnishing level.
@@ -13,15 +21,7 @@ const templateCache = new Map();
  * @returns {Promise<{layout, pieces}>}
  */
 export async function resolveTemplate(roomType, furnishingLevel) {
-  const cacheKey = roomType;
-
-  if (!templateCache.has(cacheKey)) {
-    const res = await fetch(`/data/templates/${roomType}.json`);
-    if (!res.ok) throw new Error(`Template not found: ${roomType}`);
-    templateCache.set(cacheKey, await res.json());
-  }
-
-  const template = templateCache.get(cacheKey);
+  const template = TEMPLATES[roomType] || TEMPLATES['living_room'];
 
   // Find the best matching layout for this furnishing level
   // Prefer exact match; fall back to first layout that supports this level

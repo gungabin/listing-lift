@@ -4,9 +4,12 @@
  * Loads and caches furniture asset descriptors (JSON) and images (SVG/PNG).
  * Uses module-level Maps to avoid re-fetching across calls.
  *
- * Base path for all assets: /assets/furniture/
- * Asset index lives at: /src/data/assetIndex.json
+ * Asset index is imported as a module (lives in /src/data/, not /public/).
+ * Asset images + descriptor JSON files are fetched from /public/assets/furniture/
+ * which Vite serves at /assets/furniture/.
  */
+
+import assetIndex from '@/data/assetIndex.json';
 
 const ASSET_BASE_PATH = '/assets/furniture/';
 
@@ -69,20 +72,6 @@ export async function loadAssetImage(path) {
  *   A Map keyed by asset id (e.g. "sofa-transitional-01")
  */
 export async function loadAssetPack(styleId) {
-  // Load the asset index
-  let assetIndex;
-  try {
-    const res = await fetch('/src/data/assetIndex.json');
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    assetIndex = await res.json();
-  } catch (err) {
-    console.warn('[assetLoader] Could not load assetIndex.json from /src/data/, trying /assets/assetIndex.json');
-    // Fallback: try from public root
-    const res2 = await fetch('/assetIndex.json');
-    if (!res2.ok) throw new Error(`[assetLoader] Failed to load asset index: ${err.message}`);
-    assetIndex = await res2.json();
-  }
-
   // Find the best-matching pack — exact style match first, then first pack as fallback
   const pack =
     assetIndex.packs.find((p) => p.id === styleId) ||
