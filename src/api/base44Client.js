@@ -430,7 +430,11 @@ async function runReplicateStaging(job) {
 //   Too high → rug/furniture starts getting erased
 //   ~55 works well for typical wood floors. Adjust if needed.
 // ---------------------------------------------------------------------------
-const FLOOR_THRESHOLD = 55;
+// Threshold for floor compositing color distance:
+//   < threshold → AI just recolored/replaced the floor → restore original
+//   ≥ threshold → furniture leg, rug, or shadow → keep AI pixel
+// 55 works for subtle OpenAI recoloring; 120 needed for Flux full floor replacement
+const FLOOR_THRESHOLD = 120;
 
 async function compositeStructure(originalFile, stagedBlobUrl) {
   return new Promise((resolve, reject) => {
@@ -598,9 +602,14 @@ async function stageJob(jobId) {
     let stagedImageUrl;
 
     if (replicateKey || localStorage.getItem('ll_replicate_key')) {
-      // Replicate Flux Fill Pro — true inpainting with mask (best quality + room preservation)
+      // Replicate Flux Fill Pro — mask protects walls/ceiling, compositing restores floor
       console.info('[Listing Lift] Using Replicate Flux Fill Pro');
-      stagedImageUrl = await runReplicateStaging(job);
+      const replicateUrl = await runReplicateStaging(job);
+      // Composite original floor back — Flux regenerates it even in the furniture zone
+      const originalFile = fileStore.get(job.original_image_url);
+      stagedImageUrl = originalFile
+        ? await compositeStructure(originalFile, replicateUrl)
+        : replicateUrl;
     } else if (openaiKey) {
       // OpenAI gpt-image-1 — generative with post-processing compositing
       console.info('[Listing Lift] Using OpenAI gpt-image-1 (add VITE_REPLICATE_API_KEY for better results)');
