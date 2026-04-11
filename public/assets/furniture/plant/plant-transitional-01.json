@@ -1,0 +1,22 @@
+{
+  "id": "plant-transitional-01",
+  "category": "plant",
+  "styles": ["transitional", "modern", "scandinavian", "coastal", "farmhouse"],
+  "width_ft": 2.0,
+  "depth_ft": 2.0,
+  "height_ft": 5.0,
+  "floor_anchor_y": 0.92,
+  "shadow": {
+    "opacity": 0.14,
+    "blur_px": 10,
+    "offset_x": 0.0,
+    "offset_y": 0.01,
+    "spread": 0.45
+  },
+  "z_layer": 1,
+  "default_zone": "back-right-corner",
+  "needs_rug": false,
+  "palette": ["#5A9040", "#4A8030", "#A08070"],
+  "tags": ["plant", "tall", "greenery", "fiddle-leaf"],
+  "file": "plant/plant-transitional-01.svg"
+}

@@ -1,0 +1,22 @@
+{
+  "id": "side-table-transitional-01",
+  "category": "side_table",
+  "styles": ["transitional", "traditional", "modern"],
+  "width_ft": 1.75,
+  "depth_ft": 1.75,
+  "height_ft": 2.25,
+  "floor_anchor_y": 0.90,
+  "shadow": {
+    "opacity": 0.15,
+    "blur_px": 10,
+    "offset_x": 0.0,
+    "offset_y": 0.02,
+    "spread": 0.55
+  },
+  "z_layer": 2,
+  "default_zone": "sofa-left-corner",
+  "needs_rug": false,
+  "palette": ["#8B6840", "#7A5C35", "#6B5030"],
+  "tags": ["table", "side", "wood", "round"],
+  "file": "side_table/side-table-transitional-01.svg"
+}

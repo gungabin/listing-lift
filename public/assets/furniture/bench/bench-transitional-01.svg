@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 200" width="500" height="200">
+  <!-- Upholstered seat cushion -->
+  <rect x="20" y="30" width="460" height="80" rx="10" ry="10" fill="#C8BFB4"/>
+  <!-- Seat top highlight -->
+  <rect x="30" y="35" width="440" height="30" rx="6" ry="6" fill="#D8D0C6" opacity="0.6"/>
+  <!-- Seat side welt seam -->
+  <rect x="20" y="100" width="460" height="12" rx="0" ry="0" fill="#B0A898"/>
+  <!-- Seat base rail -->
+  <rect x="20" y="108" width="460" height="18" rx="4" ry="4" fill="#9B7850"/>
+  <!-- Seat frame left -->
+  <rect x="20" y="30" width="20" height="96" rx="5" ry="5" fill="#B8B0A6"/>
+  <!-- Seat frame right -->
+  <rect x="460" y="30" width="20" height="96" rx="5" ry="5" fill="#B8B0A6"/>
+  <!-- Front left leg -->
+  <rect x="45" y="122" width="24" height="65" rx="5" ry="5" fill="#9B7850"/>
+  <!-- Front right leg -->
+  <rect x="431" y="122" width="24" height="65" rx="5" ry="5" fill="#9B7850"/>
+  <!-- Back left leg -->
+  <rect x="68" y="122" width="16" height="52" rx="4" ry="4" fill="#7A5C35"/>
+  <!-- Back right leg -->
+  <rect x="416" y="122" width="16" height="52" rx="4" ry="4" fill="#7A5C35"/>
+  <!-- Stretcher bar -->
+  <rect x="70" y="158" width="360" height="10" rx="4" ry="4" fill="#8B6840"/>
+  <!-- Button tufting hints -->
+  <circle cx="165" cy="72" r="5" fill="#A89880" opacity="0.8"/>
+  <circle cx="250" cy="72" r="5" fill="#A89880" opacity="0.8"/>
+  <circle cx="335" cy="72" r="5" fill="#A89880" opacity="0.8"/>
+</svg>

@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 350 350" width="350" height="350">
+  <!-- Back cushion -->
+  <rect x="30" y="60" width="290" height="140" rx="14" ry="14" fill="#D8CFC4"/>
+  <!-- Back frame -->
+  <rect x="20" y="50" width="310" height="20" rx="8" ry="8" fill="#C0B4A4"/>
+  <!-- Left arm -->
+  <rect x="20" y="150" width="45" height="80" rx="10" ry="10" fill="#C0B4A4"/>
+  <!-- Right arm -->
+  <rect x="285" y="150" width="45" height="80" rx="10" ry="10" fill="#C0B4A4"/>
+  <!-- Seat cushion -->
+  <rect x="35" y="185" width="280" height="80" rx="8" ry="8" fill="#E0D8CC"/>
+  <!-- Seat base -->
+  <rect x="30" y="255" width="290" height="25" rx="4" ry="4" fill="#B8AC9E"/>
+  <!-- Front left leg -->
+  <rect x="50" y="270" width="24" height="55" rx="5" ry="5" fill="#9B7A55"/>
+  <!-- Front right leg -->
+  <rect x="276" y="270" width="24" height="55" rx="5" ry="5" fill="#9B7A55"/>
+  <!-- Back left leg -->
+  <rect x="68" y="268" width="16" height="42" rx="4" ry="4" fill="#856640"/>
+  <!-- Back right leg -->
+  <rect x="266" y="268" width="16" height="42" rx="4" ry="4" fill="#856640"/>
+  <!-- Cushion button detail -->
+  <circle cx="175" cy="130" r="5" fill="#B8AA98"/>
+  <circle cx="120" cy="130" r="5" fill="#B8AA98"/>
+  <circle cx="230" cy="130" r="5" fill="#B8AA98"/>
+</svg>

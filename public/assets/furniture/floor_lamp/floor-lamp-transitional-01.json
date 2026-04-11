@@ -1,0 +1,22 @@
+{
+  "id": "floor-lamp-transitional-01",
+  "category": "floor_lamp",
+  "styles": ["transitional", "traditional", "modern"],
+  "width_ft": 1.5,
+  "depth_ft": 1.5,
+  "height_ft": 5.5,
+  "floor_anchor_y": 0.92,
+  "shadow": {
+    "opacity": 0.14,
+    "blur_px": 10,
+    "offset_x": 0.0,
+    "offset_y": 0.01,
+    "spread": 0.50
+  },
+  "z_layer": 1,
+  "default_zone": "sofa-right-corner",
+  "needs_rug": false,
+  "palette": ["#F5EDD8", "#B8A060", "#A8903C"],
+  "tags": ["lighting", "tall", "brass"],
+  "file": "floor_lamp/floor-lamp-transitional-01.svg"
+}

@@ -1,0 +1,22 @@
+{
+  "id": "sofa-transitional-01",
+  "category": "sofa",
+  "styles": ["transitional", "modern", "scandinavian"],
+  "width_ft": 7.5,
+  "depth_ft": 3.5,
+  "height_ft": 3.0,
+  "floor_anchor_y": 0.88,
+  "shadow": {
+    "opacity": 0.20,
+    "blur_px": 18,
+    "offset_x": 0.0,
+    "offset_y": 0.02,
+    "spread": 0.80
+  },
+  "z_layer": 1,
+  "default_zone": "back-center",
+  "needs_rug": true,
+  "palette": ["#E8E0D4", "#D8CFC4", "#A08060"],
+  "tags": ["seating", "primary", "upholstered"],
+  "file": "sofa/sofa-transitional-01.svg"
+}

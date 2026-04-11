@@ -1,0 +1,22 @@
+{
+  "id": "coffee-table-transitional-01",
+  "category": "coffee_table",
+  "styles": ["transitional", "modern", "traditional"],
+  "width_ft": 4.0,
+  "depth_ft": 2.0,
+  "height_ft": 1.5,
+  "floor_anchor_y": 0.90,
+  "shadow": {
+    "opacity": 0.18,
+    "blur_px": 12,
+    "offset_x": 0.0,
+    "offset_y": 0.03,
+    "spread": 0.75
+  },
+  "z_layer": 2,
+  "default_zone": "sofa-front-center",
+  "needs_rug": false,
+  "palette": ["#8B6840", "#6B5030", "#A07850"],
+  "tags": ["table", "center", "wood"],
+  "file": "coffee_table/coffee-table-transitional-01.svg"
+}

@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 300" width="800" height="300">
+  <!-- Sofa base / body -->
+  <rect x="40" y="120" width="720" height="130" rx="8" ry="8" fill="#E8E0D4"/>
+  <!-- Back cushion left -->
+  <rect x="55" y="70" width="215" height="110" rx="10" ry="10" fill="#D8CFC4"/>
+  <!-- Back cushion center -->
+  <rect x="292" y="70" width="215" height="110" rx="10" ry="10" fill="#D8CFC4"/>
+  <!-- Back cushion right -->
+  <rect x="529" y="70" width="215" height="110" rx="10" ry="10" fill="#D8CFC4"/>
+  <!-- Seat cushion left -->
+  <rect x="55" y="160" width="220" height="70" rx="6" ry="6" fill="#E0D8CC"/>
+  <!-- Seat cushion right -->
+  <rect x="520" y="160" width="220" height="70" rx="6" ry="6" fill="#E0D8CC"/>
+  <!-- Seat cushion center -->
+  <rect x="290" y="160" width="220" height="70" rx="6" ry="6" fill="#E0D8CC"/>
+  <!-- Left arm -->
+  <rect x="20" y="110" width="55" height="130" rx="10" ry="10" fill="#C8BFB4"/>
+  <!-- Right arm -->
+  <rect x="725" y="110" width="55" height="130" rx="10" ry="10" fill="#C8BFB4"/>
+  <!-- Left front leg -->
+  <rect x="60" y="238" width="28" height="40" rx="4" ry="4" fill="#A08060"/>
+  <!-- Right front leg -->
+  <rect x="712" y="238" width="28" height="40" rx="4" ry="4" fill="#A08060"/>
+  <!-- Left back leg -->
+  <rect x="85" y="238" width="16" height="30" rx="3" ry="3" fill="#906C50"/>
+  <!-- Right back leg -->
+  <rect x="700" y="238" width="16" height="30" rx="3" ry="3" fill="#906C50"/>
+  <!-- Cushion seam lines -->
+  <line x1="276" y1="72" x2="276" y2="178" stroke="#C0B4A4" stroke-width="2"/>
+  <line x1="523" y1="72" x2="523" y2="178" stroke="#C0B4A4" stroke-width="2"/>
+  <line x1="276" y1="162" x2="276" y2="228" stroke="#C0B4A4" stroke-width="2"/>
+  <line x1="523" y1="162" x2="523" y2="228" stroke="#C0B4A4" stroke-width="2"/>
+</svg>

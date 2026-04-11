@@ -1,0 +1,746 @@
+================================================================================
+LISTING LIFT — REVISED STAGING ARCHITECTURE
+Deterministic Compositing Engine with Curated Asset Library
+Written: 2026-04-10 | Status: MVP Design
+================================================================================
+
+This document replaces the generative-inpainting approach entirely.
+The system is redesigned as a deterministic compositing engine.
+AI is used only where it improves consistency, never where it risks it.
+
+
+────────────────────────────────────────────────────────────────────────────────
+1. ARCHITECTURE OVERVIEW
+────────────────────────────────────────────────────────────────────────────────
+
+CORE PRINCIPLE
+  The original room photo is never modified. It is the permanent base layer.
+  All furniture, rugs, and accessories are transparent PNG assets composited
+  on top of the original image in a controlled layer stack.
+
+  The system is a pipeline, not a prompt. Every output is deterministic —
+  the same room photo + same template + same asset pack = same result.
+  This is a product guarantee, not a coincidence.
+
+PIPELINE (one job, fully automated, no human involvement)
+
+  [1] Client uploads room photo
+           ↓
+  [2] DEPTH ESTIMATION (Replicate: Depth Anything v2)
+      → Produces a grayscale depth map (near = bright, far = dark)
+      → Used to derive: floor plane, depth zones, scale factors
+           ↓
+  [3] FLOOR PLANE DETECTION (deterministic, from depth map)
+      → Identifies the polygon of valid floor pixels
+      → Excludes: baseboard edge, wall base, doorways, fireplace zones
+      → Produces: placement polygon + vanishing point estimate
+           ↓
+  [4] OBSTACLE EXCLUSION (rule-based, client-configurable later)
+      → Marks regions near edges as no-place zones
+      → Doors, windows, fireplaces flagged via template + optional AI assist (Phase 2)
+           ↓
+  [5] TEMPLATE ENGINE
+      → Client selected room type + style + furnishing level
+      → Template engine selects a layout template for this room type
+      → Template defines: which pieces, in what positions, in what order
+           ↓
+  [6] ASSET SELECTION
+      → For each piece in the template, select best-matching asset from library
+      → Match on: style, category, color palette (later: AI-assisted matching)
+           ↓
+  [7] COMPOSITING ENGINE (runs client-side via Canvas API or Vercel serverless)
+      → For each asset in layer order (bottom to top):
+          a. Calculate pixel dimensions from real-world size + depth zone
+          b. Apply perspective correction (scale by depth, adjust vertical anchor)
+          c. Render contact shadow layer beneath asset
+          d. Composite onto base image
+      → Final output: single flattened PNG, base photo untouched underneath
+           ↓
+  [8] JOB COMPLETE
+      → Client sees result, can download, toggle original/staged
+
+
+────────────────────────────────────────────────────────────────────────────────
+2. MVP STACK
+────────────────────────────────────────────────────────────────────────────────
+
+FRONTEND
+  React + Vite (already in place)
+  Canvas 2D API — all compositing runs here, no server needed for rendering
+  Web Workers — run depth map processing off the main thread (no UI freeze)
+
+AI SERVICES (Replicate — pay per call, no infrastructure)
+  Depth Anything v2    $0.0023/image   floor plane + depth zones
+  SAM 2                $0.0015/image   Phase 2 only (obstacle segmentation)
+  Total AI cost/image: ~$0.004 for MVP (vs $0.05 for Flux Fill Pro)
+
+ASSET DELIVERY
+  MVP:   Assets bundled in /public/assets/furniture/ as PNG files
+         (acceptable for <200 assets; served by Vite/Vercel for free)
+  Later: Cloudflare R2 or similar CDN once asset library grows past 500 files
+
+STORAGE
+  MVP:   localStorage for jobs, sessionStorage for in-flight compositing state
+  Later: Supabase (Postgres + Storage) — one table for jobs, one bucket for output images
+
+HOSTING
+  Vercel — same plan as before
+  Serverless function /api/depth — proxies Replicate depth call (keeps API key server-side)
+  Serverless function /api/stage — optional: move heavy compositing off client in Phase 2
+
+PAYMENTS
+  Stripe — same plan, no change
+
+
+────────────────────────────────────────────────────────────────────────────────
+3. DATA STRUCTURES
+────────────────────────────────────────────────────────────────────────────────
+
+3A. FURNITURE ASSET
+
+Each asset is a transparent PNG (or WebP) of a single piece of furniture,
+photographed or rendered from a consistent camera angle (straight-on, slight
+3/4 perspective). Every asset must have an accompanying JSON descriptor.
+
+File location: /public/assets/furniture/{category}/{id}.png
+               /public/assets/furniture/{category}/{id}.json
+
+Asset descriptor schema:
+
+{
+  "id": "sofa-transitional-01",
+
+  // What kind of piece this is
+  "category": "sofa",                   // sofa | coffee_table | accent_chair |
+                                        // side_table | floor_lamp | table_lamp |
+                                        // dresser | nightstand | bed | dining_table |
+                                        // dining_chair | bench | bookshelf | rug |
+                                        // plant | art | accessory
+
+  // Which decor styles this asset fits
+  "styles": ["transitional", "modern", "scandinavian"],
+
+  // Real-world dimensions in feet (used for perspective scaling)
+  "width_ft": 7.5,
+  "depth_ft": 3.5,
+  "height_ft": 3.0,
+
+  // Where the asset visually "sits" — the pixel row (0.0–1.0) that touches the floor
+  // 0.85 means the bottom 15% of the PNG is the base/legs touching floor
+  "floor_anchor_y": 0.88,
+
+  // Shadow parameters
+  "shadow": {
+    "opacity": 0.22,
+    "blur_px": 14,
+    "offset_x": 0.02,      // fraction of asset width, negative = left
+    "offset_y": 0.04,      // fraction of asset height, pushes shadow down
+    "spread": 0.85          // how wide the shadow ellipse is relative to asset base
+  },
+
+  // Compositing layer — lower number renders first (further back)
+  "z_layer": 2,             // 0=rug, 1=back_wall_furniture, 2=mid_furniture, 3=foreground
+
+  // Default placement zone (overridable by template)
+  "default_zone": "back-center",
+
+  // Whether this piece needs a rug underneath it
+  "needs_rug": true,
+
+  // Color palette (dominant colors as hex, for future style matching)
+  "palette": ["#F5F0E8", "#D4C5B0", "#8B7355"],
+
+  // Tags for filtering
+  "tags": ["seating", "primary", "upholstered"]
+}
+
+
+3B. RUG ASSET (special case — full-width flat asset)
+
+{
+  "id": "rug-transitional-01",
+  "category": "rug",
+  "styles": ["transitional", "modern", "scandinavian"],
+
+  // Real-world dimensions
+  "width_ft": 9.0,
+  "depth_ft": 12.0,
+
+  // Rugs have no height — they lie flat and require perspective transform
+  // The PNG is a top-down flat view; the compositor applies foreshortening
+  "is_flat": true,
+
+  // Shadow is just a very soft edge vignette, not a drop shadow
+  "shadow": {
+    "opacity": 0.10,
+    "edge_blur_px": 8
+  },
+
+  "z_layer": 0,             // Always renders first (below everything)
+  "palette": ["#E8E0D5", "#C4B8A8", "#6B5E4E"]
+}
+
+
+3C. ROOM TEMPLATE
+
+Templates define the layout logic for each room type. They are not tied to
+specific assets — they define categories, positions, and rules. Asset selection
+happens separately.
+
+File location: /src/data/templates/{room_type}.json
+
+Living room template example:
+
+{
+  "room_type": "living_room",
+  "aspect_ratio_target": "landscape",   // expected photo orientation
+
+  "layouts": [
+    {
+      "id": "living-classic-grouping",
+      "name": "Classic Seating Grouping",
+      "min_room_width_ft": 12,           // don't use this layout if room appears narrower
+      "furnishing_levels": ["medium", "full"],
+
+      // Pieces in render order (bottom layer first)
+      "pieces": [
+        {
+          "slot": "rug",
+          "category": "rug",
+          "required": true,
+          "z_layer": 0,
+          "position": {
+            "anchor": "floor-center",
+            "depth_zone": "mid",          // far | mid | near
+            "x_offset": 0.0,              // fraction of floor width, 0 = center
+            "y_offset": 0.0
+          }
+        },
+        {
+          "slot": "primary_sofa",
+          "category": "sofa",
+          "required": true,
+          "z_layer": 1,
+          "position": {
+            "anchor": "back-center",
+            "depth_zone": "far",
+            "x_offset": 0.0,
+            "y_offset": 0.05            // slight push toward center from back wall
+          }
+        },
+        {
+          "slot": "coffee_table",
+          "category": "coffee_table",
+          "required": true,
+          "z_layer": 2,
+          "position": {
+            "anchor": "sofa-front-center",
+            "depth_zone": "mid",
+            "gap_from_sofa_ft": 1.5     // real-world gap between sofa front and table back
+          }
+        },
+        {
+          "slot": "accent_chair_left",
+          "category": "accent_chair",
+          "required": false,
+          "furnishing_level_min": "medium",
+          "z_layer": 2,
+          "position": {
+            "anchor": "coffee-table-left",
+            "angle_deg": 30,             // angle chairs inward toward center
+            "depth_zone": "mid",
+            "x_offset": -0.22
+          }
+        },
+        {
+          "slot": "accent_chair_right",
+          "category": "accent_chair",
+          "required": false,
+          "furnishing_level_min": "medium",
+          "z_layer": 2,
+          "position": {
+            "anchor": "coffee-table-right",
+            "angle_deg": -30,
+            "depth_zone": "mid",
+            "x_offset": 0.22
+          }
+        },
+        {
+          "slot": "floor_lamp",
+          "category": "floor_lamp",
+          "required": false,
+          "furnishing_level_min": "full",
+          "z_layer": 1,
+          "position": {
+            "anchor": "sofa-right-corner",
+            "depth_zone": "far",
+            "x_offset": 0.15
+          }
+        },
+        {
+          "slot": "side_table",
+          "category": "side_table",
+          "required": false,
+          "furnishing_level_min": "full",
+          "z_layer": 2,
+          "position": {
+            "anchor": "accent-chair-left-side",
+            "depth_zone": "mid"
+          }
+        },
+        {
+          "slot": "plant",
+          "category": "plant",
+          "required": false,
+          "furnishing_level_min": "full",
+          "z_layer": 1,
+          "position": {
+            "anchor": "back-right-corner",
+            "depth_zone": "far"
+          }
+        }
+      ]
+    },
+
+    {
+      "id": "living-minimal",
+      "name": "Minimal Staging",
+      "furnishing_levels": ["light"],
+      "pieces": [
+        { "slot": "rug",           "category": "rug",          "required": true,  "z_layer": 0 },
+        { "slot": "primary_sofa",  "category": "sofa",         "required": true,  "z_layer": 1 },
+        { "slot": "coffee_table",  "category": "coffee_table", "required": true,  "z_layer": 2 }
+      ]
+    }
+  ]
+}
+
+
+3D. DEPTH ZONE DEFINITIONS
+
+Depth zones translate the depth map into scale factors for compositing.
+They are calibrated assuming a standard real estate wide-angle lens (24–35mm
+equivalent).
+
+{
+  "depth_zones": {
+    "far": {
+      "depth_map_range": [0.0, 0.35],    // depth map brightness range (0=far, 1=near)
+      "y_position_range": [0.45, 0.58],  // where this zone sits vertically in frame
+      "scale_factor": 0.52               // asset scale relative to its "mid" size
+    },
+    "mid": {
+      "depth_map_range": [0.35, 0.65],
+      "y_position_range": [0.58, 0.72],
+      "scale_factor": 0.72
+    },
+    "near": {
+      "depth_map_range": [0.65, 1.0],
+      "y_position_range": [0.72, 0.88],
+      "scale_factor": 1.0               // reference scale — assets sized for this zone
+    }
+  }
+}
+
+
+────────────────────────────────────────────────────────────────────────────────
+4. COMPOSITING ENGINE — STEP BY STEP
+────────────────────────────────────────────────────────────────────────────────
+
+INPUTS
+  - originalImage: ImageBitmap (the room photo, never modified)
+  - depthMap: ImageBitmap (grayscale depth map from Depth Anything v2)
+  - template: RoomTemplate (the selected layout)
+  - assets: Map<slot, AssetDescriptor + HTMLImageElement>
+  - floorPolygon: Polygon (detected floor boundary)
+  - vanishingPoint: {x, y} (in pixel coordinates)
+
+OUTPUT
+  - compositedImage: Blob (PNG, same dimensions as original)
+
+STEP 4-1: INITIALIZE CANVAS
+  Create an OffscreenCanvas at originalImage dimensions.
+  Draw originalImage as the permanent base layer.
+  This layer is never written to again after this step.
+  All subsequent drawing goes onto a separate compositing canvas
+  that is flattened onto the base at the very end.
+
+STEP 4-2: COMPUTE PERSPECTIVE TRANSFORM
+  From the vanishing point and depth map:
+
+  a. Identify the horizon line (y position where floor meets wall)
+     → Typically where depth map transitions from far (dark) to mid range
+     → Clamp between 30% and 55% of image height
+
+  b. Calculate the perspective scale function:
+     Given a y position in the image, what scale factor applies?
+
+     scaleAtY(y) {
+       const horizonY = horizon line y coordinate
+       const floorY   = floor bottom y coordinate (typically 85–95% of image height)
+       const t = (y - horizonY) / (floorY - horizonY)   // 0 at horizon, 1 at bottom
+       return lerp(FAR_SCALE, NEAR_SCALE, clamp(t, 0, 1))
+     }
+
+     FAR_SCALE  = 0.45 (assets appear at 45% size near the back wall)
+     NEAR_SCALE = 1.00 (reference size at foreground)
+
+  c. Calculate horizontal foreshortening for rugs:
+     Rugs are flat objects. Their depth dimension shrinks as they recede.
+     perspectiveRugHeight(actualHeight) = actualHeight * sin(cameraAngle)
+     Camera angle estimated from vanishing point position ≈ 25–35 degrees
+     for typical real estate photography.
+
+STEP 4-3: RESOLVE FLOOR PLANE COORDINATES
+  For each template piece position (e.g. "back-center", "sofa-front-center"):
+
+  a. Map named positions to floor plane coordinates:
+     "back-center"      → x: 50% of floor width, y: 10% from back wall
+     "floor-center"     → x: 50%, y: 50%
+     "back-right-corner"→ x: 82%, y: 12%
+     etc.
+
+  b. Convert floor plane (u,v) coordinates to image (x,y) pixel coordinates
+     using the perspective transform matrix.
+
+  c. Verify the resolved pixel position is inside the floor polygon.
+     If not, nudge toward the nearest valid point.
+
+STEP 4-4: RENDER EACH PIECE (in z_layer order, low to high)
+
+  For each piece:
+
+  a. CALCULATE PIXEL DIMENSIONS
+     realWorldWidthPx = (asset.width_ft / ROOM_WIDTH_FT) * imageWidth * scaleAtY(anchorY)
+     realWorldHeightPx = realWorldWidthPx * (asset.height_ft / asset.width_ft)
+
+     Where ROOM_WIDTH_FT is estimated from depth map (default: 15ft for living room)
+
+  b. CALCULATE ANCHOR POSITION
+     anchorX = resolved floor x coordinate
+     anchorY = resolved floor y coordinate
+     drawX   = anchorX - (realWorldWidthPx / 2)
+     drawY   = anchorY - (realWorldHeightPx * asset.floor_anchor_y)
+
+  c. RENDER SHADOW (before drawing the asset)
+     Draw an ellipse at the base of the asset:
+       cx      = anchorX + (asset.shadow.offset_x * realWorldWidthPx)
+       cy      = anchorY + (asset.shadow.offset_y * realWorldHeightPx)
+       rx      = (realWorldWidthPx / 2) * asset.shadow.spread
+       ry      = rx * 0.22                 // flatten the ellipse
+       blur    = asset.shadow.blur_px * scaleAtY(anchorY)
+       opacity = asset.shadow.opacity
+
+     Draw with ctx.filter = `blur(${blur}px)`, fill with rgba(0,0,0,opacity)
+     Reset filter after drawing.
+
+  d. RENDER ASSET
+     ctx.drawImage(assetImage, drawX, drawY, realWorldWidthPx, realWorldHeightPx)
+
+STEP 4-5: RENDER RUG (special — flat perspective transform)
+
+  Rugs require a perspective transform because they are flat on the floor.
+  A standard drawImage would make them look like a rectangular poster.
+
+  a. Get the four corners of the rug in floor plane coordinates
+     (front-left, front-right, back-left, back-right)
+
+  b. Project each corner through the perspective transform to get image coordinates
+
+  c. Use CSS transform or WebGL perspective to draw the PNG into those four corners
+     (Canvas 2D does not natively support 4-point perspective; options:
+      - Use a WebGL canvas for the rug only, composite result
+      - Approximate with two triangles using canvas transform()
+      - Use the perspective-transform npm library — lightweight, no WebGL)
+
+  d. Apply soft edge shadow around rug perimeter (very subtle, 6–10px blur)
+
+STEP 4-6: FLATTEN AND EXPORT
+  Draw the compositing canvas onto the base canvas.
+  Export as PNG blob.
+  This is the final output. The original photo is pixel-for-pixel identical
+  underneath — it was drawn once at step 4-1 and never touched again.
+
+
+────────────────────────────────────────────────────────────────────────────────
+5. AUTO-PLACEMENT RULES — LIVING ROOM & BEDROOM
+────────────────────────────────────────────────────────────────────────────────
+
+5A. LIVING ROOM
+
+SOFA PLACEMENT
+  Rule: Primary sofa always anchors to the back wall, centered horizontally.
+  - Position: back-center, depth zone = far
+  - If vanishing point x is significantly off-center (>15% from center),
+    offset the sofa toward the VP to maintain visual balance
+  - Minimum clearance from left/right walls: 0.8ft equivalent pixels
+  - If room appears narrow (<11ft estimated), use a loveseat asset instead of sofa
+
+COFFEE TABLE PLACEMENT
+  Rule: Always centered in front of the sofa.
+  - Gap from sofa front face: 1.5ft real-world (scaled to perspective)
+  - Horizontal center: matches sofa center exactly
+  - If gap calculation pushes coffee table into near zone (<55% from top),
+    reduce gap to 1.0ft
+
+ACCENT CHAIRS (pair)
+  Rule: Flank the coffee table, angled inward 30 degrees.
+  - Left chair center: coffee_table center x - (coffee_table width * 0.65)
+  - Right chair center: coffee_table center x + (coffee_table width * 0.65)
+  - Both chairs at same y as coffee table (mid depth zone)
+  - Angle: apply CSS/canvas rotation of ±15–20 degrees (light, not dramatic)
+  - If the chair position falls outside the floor polygon, skip that chair
+    (do not force it into an invalid position)
+
+RUG PLACEMENT
+  Rule: Rug goes under the sofa's front two legs and the full coffee table.
+  - Rug back edge: aligned with sofa front face - 0.5ft
+  - Rug front edge: extends 1.5ft beyond coffee table front
+  - Rug width: sofa width + 1.5ft each side (capped at floor polygon width)
+  - Render BEFORE all other furniture (z_layer = 0)
+
+FLOOR LAMP
+  - Position: beside the sofa's right arm, slightly behind the sofa plane
+  - x: sofa right edge + 0.3ft
+  - y: same depth zone as sofa (far)
+  - If a window is detected near that corner (Phase 2), move to left side
+
+PLANT
+  - Far corner, opposite side from floor lamp
+  - Use a tall plant asset (fiddle leaf fig, areca palm)
+  - Depth zone: far, against back wall
+
+CLEARANCE RULES (all positions)
+  - No asset center point may fall within 6% of image left or right edge
+  - No asset may overlap another asset's bounding box by more than 8%
+  - If overlap detected, shift the later-rendered asset outward until clear
+
+
+5B. BEDROOM
+
+BED PLACEMENT
+  Rule: Bed always anchors to the back wall, centered horizontally.
+  This is non-negotiable — beds never float in the middle of a room.
+  - Position: back-center, depth zone = far
+  - Headboard is visually flush with the back wall
+  - If room is wide (>14ft estimated), use king bed asset
+  - If room is narrow (<11ft estimated), use queen or full bed asset
+
+NIGHTSTANDS (pair)
+  Rule: One on each side of the bed, top surface aligned with mattress top.
+  - Left nightstand: bed left edge - nightstand width - 0.2ft gap
+  - Right nightstand: bed right edge + 0.2ft gap
+  - y: same as bed, depth zone = far
+  - Nightstand top y should align with mattress top y (adjust drawY accordingly)
+  - If a nightstand position falls outside floor polygon, skip it
+
+TABLE LAMPS (on nightstands)
+  - Rendered on top of each nightstand (z_layer = nightstand z + 1)
+  - Position: centered on nightstand surface
+  - Scale: 60% of nightstand width
+
+BENCH AT FOOT OF BED
+  - Position: foot of bed, centered
+  - y: bed front face + 0.3ft gap (depth zone = mid)
+  - Width: 60–70% of bed width
+  - Skip if depth zone calculation pushes bench into near zone (too close to camera)
+
+RUG
+  - Runs under foot third of bed and full floor in front of bed
+  - Back edge: under bed, 1/3 from foot
+  - Front edge: extends to near/mid zone boundary
+  - Width: bed width + 2ft each side
+  - Render first (z_layer = 0)
+
+DRESSER
+  - Side wall placement (not back wall — reserved for bed)
+  - If room has a clear left wall: dresser on left, perpendicular to back wall
+  - x: 8–12% from left edge of floor polygon
+  - Depth zone: mid
+  - If room is square or no clear side wall detected, skip dresser
+
+CLEARANCE RULES
+  - Bed occupies the full back-center zone — no other furniture placed behind the bed
+  - Minimum aisle between bed side and wall: 2ft real-world (skip nightstand if violated)
+  - Bench must not push into camera (near zone); skip if it would
+
+
+────────────────────────────────────────────────────────────────────────────────
+6. BUILD ORDER
+────────────────────────────────────────────────────────────────────────────────
+
+PHASE 1 — FOUNDATION (Build this first, 2–3 sessions)
+
+  1.1  Asset pipeline
+       - Define the asset JSON schema (done in this doc)
+       - Source or create 8–12 furniture PNGs per style pack (Transitional first)
+         Each piece: PNG with transparency, ~2000px wide at near-zone size
+         Minimum set: sofa, coffee_table, accent_chair (x2), floor_lamp,
+                      side_table, rug, plant, bed (Q+K), nightstand (x2),
+                      bench, dresser, table_lamp
+       - Store in /public/assets/furniture/{category}/
+       - Write asset index: /src/data/assetIndex.json
+
+  1.2  Depth estimation integration
+       - Vercel serverless function: /api/depth
+         Accepts: image as base64
+         Calls: Replicate Depth Anything v2
+         Returns: depth map as base64
+       - Client sends photo to /api/depth on job creation
+       - Depth map stored alongside job in localStorage
+
+  1.3  Floor plane detection (client-side, from depth map)
+       - Scan depth map for floor region using brightness thresholds
+       - Derive: horizon y, floor polygon, vanishing point estimate
+       - Output: FloorGeometry object used by compositor
+
+  1.4  Template engine
+       - Build /src/data/templates/living_room.json
+       - Build /src/data/templates/bedroom.json
+       - Template resolver: given room_type + furnishing_level → selected layout
+
+  1.5  Compositing engine (client-side, Canvas 2D)
+       - Implement steps 4-1 through 4-6 from Section 4
+       - Perspective scale function
+       - Shadow rendering
+       - Asset placement loop
+       - Rug perspective transform (use perspective-transform library)
+
+  1.6  Job flow integration
+       - Replace current base44Client stageJob() with new pipeline
+       - Job now goes: upload → /api/depth → floor detect → template → composite → done
+       - No Replicate image generation call in Phase 1 at all
+
+
+PHASE 2 — QUALITY (after Phase 1 is working cleanly)
+
+  2.1  Obstacle detection
+       - Add SAM 2 via Replicate to detect doors, windows, fireplaces
+       - Results added to floor polygon as exclusion zones
+       - Placement rules respect exclusions before resolving positions
+
+  2.2  Lighting match
+       - Detect dominant light direction from depth map highlights
+       - Adjust shadow offset_x/offset_y per job based on light source
+       - Adjust asset brightness/contrast slightly to match room exposure
+         (this is pure Canvas filter adjustment, not AI — safe)
+
+  2.3  Style-based asset matching
+       - Client selects style; asset selector filters library by style tag
+       - Add color palette matching: prefer assets whose palette is closest
+         to the room's dominant colors (extracted from original photo)
+
+  2.4  Multiple layout templates
+       - Add 2 more living room layouts (U-shape, open plan)
+       - Add dining room, kitchen, office templates
+       - Layout auto-selector: pick best template based on estimated room dimensions
+
+  2.5  Asset library expansion
+       - Add Farmhouse, Modern, Coastal packs
+       - Each pack: full furniture set (~20 assets) per style
+       - Move assets to CDN (Cloudflare R2) once library exceeds ~300 files
+
+
+PHASE 3 — SCALE (when you have real paying clients)
+
+  3.1  AI accessory generation
+       - Use Flux Schnell to generate accessories ON TRANSPARENT BACKGROUND only
+         (books, vases, small decor — low legal risk, high visual impact)
+       - These go on top of furniture surfaces, never on the room itself
+
+  3.2  Server-side compositing
+       - Move Canvas compositor to Vercel Edge Function
+       - Accepts: job parameters, returns: composited PNG stored in Supabase
+       - Removes dependency on client browser performance
+       - Enables caching of identical template+asset combos
+
+  3.3  Style transfer (lighting only)
+       - Match asset lighting to room lighting using a lightweight model
+       - Goal: assets look like they were photographed in that room's light
+       - This is an enhancement, not core functionality
+
+  3.4  Agent customization
+       - Agents upload their own logo watermark
+       - Agents can lock certain assets per style ("always use this sofa")
+       - White-label option for brokerages
+
+
+────────────────────────────────────────────────────────────────────────────────
+7. NOW VS LATER
+────────────────────────────────────────────────────────────────────────────────
+
+BUILD NOW (Phase 1 — get this working before anything else)
+  ✅ Asset JSON schema and first asset pack (Transitional, 15 pieces minimum)
+  ✅ /api/depth serverless function (Replicate Depth Anything v2)
+  ✅ Floor plane detection from depth map
+  ✅ Living room template (classic grouping layout)
+  ✅ Bedroom template (standard layout)
+  ✅ Compositing engine (Canvas 2D, client-side)
+  ✅ Perspective scale function + shadow rendering
+  ✅ Rug perspective transform
+  ✅ Wire into existing job flow (replace current stageJob)
+
+BUILD NEXT (Phase 2 — after you have paying clients or beta testers)
+  🔲 Obstacle detection (SAM 2)
+  🔲 Lighting match from depth map
+  🔲 Additional style packs (Farmhouse, Modern)
+  🔲 Additional room types (dining, office)
+  🔲 Additional layout templates per room
+
+DO NOT BUILD YET (Phase 3 — post revenue)
+  🔲 AI accessory generation
+  🔲 Server-side compositing
+  🔲 Agent customization / white-label
+  🔲 Style transfer
+  🔲 Mobile app
+
+
+────────────────────────────────────────────────────────────────────────────────
+WHAT THIS CHANGES ABOUT THE CURRENT CODEBASE
+────────────────────────────────────────────────────────────────────────────────
+
+REMOVE
+  - runReplicateStaging() — no longer generating full room images
+  - runAiStaging() — OpenAI image edits no longer used for staging
+  - compositeStructure() — pixel-diff compositing no longer needed
+  - generateInpaintMask() — no longer needed
+  - buildFluxPrompt() — no longer needed
+  - buildStagingPrompt() — no longer needed
+  - VITE_OPENAI_API_KEY — no longer needed for staging
+  - VITE_REPLICATE_API_KEY — still needed but only for /api/depth (cheap)
+  - Vite proxy for Replicate — moved to serverless function
+
+KEEP
+  - Job creation flow (base44Client entities.StagingJob)
+  - fileStore (still need the File for /api/depth)
+  - Mock mode (still useful for UI dev without burning API credits)
+  - All UI pages (Dashboard, JobDetail, History, Account)
+  - Auth system, subscription tracking
+
+ADD
+  - /api/depth serverless function
+  - /src/lib/compositor.js — the new compositing engine
+  - /src/lib/floorDetect.js — depth map → floor polygon
+  - /src/lib/templateEngine.js — layout resolution
+  - /src/lib/assetLoader.js — loads and caches asset images + descriptors
+  - /src/data/templates/ — room template JSON files
+  - /src/data/assetIndex.json — master list of all assets
+  - /public/assets/furniture/ — the actual PNG files
+
+
+────────────────────────────────────────────────────────────────────────────────
+LEGAL STATEMENT THIS ARCHITECTURE ENABLES
+────────────────────────────────────────────────────────────────────────────────
+
+"Listing Lift uses deterministic image compositing to add virtual furniture
+to your listing photos. The original photograph is never altered, processed
+through AI, or modified in any way. All furniture shown is digitally overlaid
+on top of your original photo. Walls, floors, windows, ceilings, and all
+structural features remain exactly as photographed."
+
+That statement is now 100% true. It was not true with the previous approach.
+
+
+================================================================================
+END OF ARCHITECTURE DOCUMENT
+================================================================================

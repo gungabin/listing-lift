@@ -588,36 +588,102 @@ function runMockStaging(job) {
 }
 
 // ---------------------------------------------------------------------------
-// Main staging dispatcher — called when stageImage is invoked
+// Compositing engine dispatcher
+// ---------------------------------------------------------------------------
+async function runCompositingEngine(job, originalFile) {
+  const { compositeRoom } = await import('@/lib/compositor');
+
+  // Load original image
+  const originalImage = await loadImageFromFile(originalFile);
+
+  // Try to get depth map from /api/depth; fall back to synthetic if unavailable
+  let depthMap;
+  try {
+    depthMap = await getDepthMap(originalFile);
+  } catch (e) {
+    console.warn('[Listing Lift] Depth API unavailable — using synthetic depth map');
+    depthMap = await createSyntheticDepthMap(originalImage.naturalWidth, originalImage.naturalHeight);
+  }
+
+  return compositeRoom({
+    originalImage,
+    depthMap,
+    roomType:    job.room_type   || 'living_room',
+    decorStyle:  job.decor_style || 'transitional',
+    decorLevel:  job.decor_level || 'medium',
+  });
+}
+
+function loadImageFromFile(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload  = () => { URL.revokeObjectURL(url); resolve(img); };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Failed to load image')); };
+    img.src = url;
+  });
+}
+
+async function getDepthMap(file) {
+  const dataUrl = await fileToDataUrl(file);
+  const res = await fetch('/api/depth', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ image: dataUrl }),
+  });
+  if (!res.ok) throw new Error(`Depth API error: ${res.status}`);
+  const { depthMap } = await res.json();
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload  = () => resolve(img);
+    img.onerror = reject;
+    img.src = depthMap;
+  });
+}
+
+// Synthetic depth map: assumes floor in bottom 55%, wall in top 45%.
+// Good enough for MVP when /api/depth is unavailable in local dev.
+function createSyntheticDepthMap(width, height) {
+  return new Promise((resolve) => {
+    const canvas = document.createElement('canvas');
+    canvas.width  = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+
+    const grad = ctx.createLinearGradient(0, 0, 0, height);
+    grad.addColorStop(0.00, '#111111');  // ceiling (very far)
+    grad.addColorStop(0.38, '#2a2a2a');  // back wall (far)
+    grad.addColorStop(0.52, '#555555');  // horizon transition
+    grad.addColorStop(1.00, '#cccccc');  // foreground floor (near)
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, width, height);
+
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.src = canvas.toDataURL();
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Main staging dispatcher — deterministic compositing engine
 // ---------------------------------------------------------------------------
 async function stageJob(jobId) {
   const jobs = getJobs();
   const job = jobs.find((j) => j.id === jobId);
   if (!job) return;
 
-  const replicateKey = import.meta.env.VITE_REPLICATE_API_KEY;
-  const openaiKey    = import.meta.env.VITE_OPENAI_API_KEY;
-
   try {
     let stagedImageUrl;
 
-    if (replicateKey || localStorage.getItem('ll_replicate_key')) {
-      // Replicate Flux Fill Pro — mask protects walls/ceiling, compositing restores floor
-      console.info('[Listing Lift] Using Replicate Flux Fill Pro');
-      const replicateUrl = await runReplicateStaging(job);
-      // Composite original floor back — Flux regenerates it even in the furniture zone
-      const originalFile = fileStore.get(job.original_image_url);
-      stagedImageUrl = originalFile
-        ? await compositeStructure(originalFile, replicateUrl)
-        : replicateUrl;
-    } else if (openaiKey) {
-      // OpenAI gpt-image-1 — generative with post-processing compositing
-      console.info('[Listing Lift] Using OpenAI gpt-image-1 (add VITE_REPLICATE_API_KEY for better results)');
-      stagedImageUrl = await runAiStaging(job);
-    } else {
-      // Mock mode
-      console.info('[Listing Lift] No API key found — using mock staging.');
+    const originalFile = fileStore.get(job.original_image_url);
+
+    if (!originalFile) {
+      // File not in memory (e.g. after page refresh) — use mock
+      console.info('[Listing Lift] File not in session memory — using mock staging.');
       stagedImageUrl = await runMockStaging(job);
+    } else {
+      console.info('[Listing Lift] Running deterministic compositing engine');
+      stagedImageUrl = await runCompositingEngine(job, originalFile);
     }
 
     job.status = 'completed';

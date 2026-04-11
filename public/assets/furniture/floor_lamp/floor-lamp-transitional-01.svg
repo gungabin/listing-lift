@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 150 500" width="150" height="500">
+  <!-- Lamp shade -->
+  <path d="M30,80 L120,80 L105,160 L45,160 Z" fill="#F5EDD8"/>
+  <!-- Shade inner shadow -->
+  <path d="M40,90 L110,90 L100,152 L50,152 Z" fill="#E8DFC8" opacity="0.6"/>
+  <!-- Shade top rim -->
+  <ellipse cx="75" cy="80" rx="45" ry="8" fill="#D4C8B0"/>
+  <!-- Shade bottom rim -->
+  <ellipse cx="75" cy="160" rx="30" ry="6" fill="#C4B8A0"/>
+  <!-- Neck / upper stem -->
+  <rect x="70" y="160" width="10" height="30" rx="5" ry="5" fill="#B8A060"/>
+  <!-- Arm / mid section -->
+  <path d="M75,190 Q90,240 75,280" stroke="#B8A060" stroke-width="8" fill="none" stroke-linecap="round"/>
+  <!-- Main pole -->
+  <rect x="71" y="280" width="8" height="170" rx="4" ry="4" fill="#C0AA70"/>
+  <!-- Base disc -->
+  <ellipse cx="75" cy="450" rx="40" ry="12" fill="#A8903C"/>
+  <!-- Base detail ring -->
+  <ellipse cx="75" cy="448" rx="30" ry="8" fill="#B89E50" opacity="0.6"/>
+  <!-- Bulb glow hint -->
+  <circle cx="75" cy="165" r="8" fill="#FFFAE0" opacity="0.7"/>
+</svg>

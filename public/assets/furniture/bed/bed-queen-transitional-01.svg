@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 500" width="700" height="500">
+  <!-- Headboard -->
+  <rect x="30" y="30" width="640" height="160" rx="16" ry="16" fill="#C8BFB4"/>
+  <!-- Headboard top rounded detail -->
+  <rect x="50" y="40" width="600" height="130" rx="12" ry="12" fill="#D8D0C6"/>
+  <!-- Headboard panel lines -->
+  <rect x="80" y="55" width="175" height="100" rx="8" ry="8" fill="none" stroke="#B8B0A6" stroke-width="2"/>
+  <rect x="263" y="55" width="174" height="100" rx="8" ry="8" fill="none" stroke="#B8B0A6" stroke-width="2"/>
+  <rect x="445" y="55" width="175" height="100" rx="8" ry="8" fill="none" stroke="#B8B0A6" stroke-width="2"/>
+  <!-- Mattress base -->
+  <rect x="30" y="175" width="640" height="230" rx="6" ry="6" fill="#E8E4E0"/>
+  <!-- Duvet/bedding top -->
+  <rect x="35" y="180" width="630" height="200" rx="8" ry="8" fill="#F5F2EE"/>
+  <!-- Duvet fold at top -->
+  <path d="M35,180 Q350,195 665,180 Q665,215 350,225 Q35,215 35,180" fill="#E8E4DE"/>
+  <!-- Left pillow -->
+  <rect x="55" y="188" width="245" height="110" rx="10" ry="10" fill="#FAFAF8"/>
+  <!-- Right pillow -->
+  <rect x="400" y="188" width="245" height="110" rx="10" ry="10" fill="#FAFAF8"/>
+  <!-- Pillow shadow bottom -->
+  <rect x="55" y="285" width="245" height="15" rx="0" ry="0" fill="#D8D4D0" opacity="0.5"/>
+  <rect x="400" y="285" width="245" height="15" rx="0" ry="0" fill="#D8D4D0" opacity="0.5"/>
+  <!-- Duvet lower decorative stitch line -->
+  <line x1="55" y1="330" x2="645" y2="330" stroke="#D8D4CE" stroke-width="2" stroke-dasharray="8,4"/>
+  <!-- Foot board / base -->
+  <rect x="30" y="398" width="640" height="50" rx="6" ry="6" fill="#C8BFB4"/>
+  <!-- Left front leg -->
+  <rect x="40" y="440" width="30" height="45" rx="5" ry="5" fill="#9B7A55"/>
+  <!-- Right front leg -->
+  <rect x="630" y="440" width="30" height="45" rx="5" ry="5" fill="#9B7A55"/>
+  <!-- Left back leg -->
+  <rect x="58" y="436" width="20" height="35" rx="4" ry="4" fill="#856640"/>
+  <!-- Right back leg -->
+  <rect x="622" y="436" width="20" height="35" rx="4" ry="4" fill="#856640"/>
+</svg>

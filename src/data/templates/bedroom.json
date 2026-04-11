@@ -1,0 +1,175 @@
+{
+  "room_type": "bedroom",
+  "aspect_ratio_target": "landscape",
+  "estimated_room_width_ft": 13,
+  "estimated_room_depth_ft": 15,
+
+  "anchor_positions": {
+    "back-center":              { "u": 0.50, "v": 0.10 },
+    "bed-left-side":            { "u": 0.24, "v": 0.12 },
+    "bed-right-side":           { "u": 0.76, "v": 0.12 },
+    "bed-foot-center":          { "u": 0.50, "v": 0.40 },
+    "left-wall-center":         { "u": 0.10, "v": 0.30 },
+    "nightstand-left-surface":  { "u": 0.24, "v": 0.12 },
+    "nightstand-right-surface": { "u": 0.76, "v": 0.12 }
+  },
+
+  "layouts": [
+    {
+      "id": "bedroom-standard",
+      "name": "Standard Bedroom",
+      "min_room_width_ft": 10,
+      "furnishing_levels": ["medium", "full"],
+
+      "pieces": [
+        {
+          "slot": "rug",
+          "category": "rug",
+          "required": true,
+          "z_layer": 0,
+          "position": {
+            "anchor": "back-center",
+            "depth_zone": "mid",
+            "x_offset": 0.0,
+            "y_offset": 0.3
+          }
+        },
+        {
+          "slot": "primary_bed",
+          "category": "bed",
+          "required": true,
+          "z_layer": 1,
+          "position": {
+            "anchor": "back-center",
+            "depth_zone": "far",
+            "x_offset": 0.0,
+            "y_offset": 0.0
+          }
+        },
+        {
+          "slot": "nightstand_left",
+          "category": "nightstand",
+          "required": false,
+          "furnishing_level_min": "medium",
+          "z_layer": 2,
+          "position": {
+            "anchor": "bed-left-side",
+            "depth_zone": "far",
+            "x_offset": -0.18,
+            "y_offset": 0.0
+          }
+        },
+        {
+          "slot": "nightstand_right",
+          "category": "nightstand",
+          "required": false,
+          "furnishing_level_min": "medium",
+          "z_layer": 2,
+          "position": {
+            "anchor": "bed-right-side",
+            "depth_zone": "far",
+            "x_offset": 0.18,
+            "y_offset": 0.0
+          }
+        },
+        {
+          "slot": "table_lamp_left",
+          "category": "table_lamp",
+          "required": false,
+          "furnishing_level_min": "medium",
+          "z_layer": 3,
+          "position": {
+            "anchor": "nightstand-left-surface",
+            "depth_zone": "far",
+            "x_offset": -0.18,
+            "y_offset": -0.04
+          }
+        },
+        {
+          "slot": "table_lamp_right",
+          "category": "table_lamp",
+          "required": false,
+          "furnishing_level_min": "medium",
+          "z_layer": 3,
+          "position": {
+            "anchor": "nightstand-right-surface",
+            "depth_zone": "far",
+            "x_offset": 0.18,
+            "y_offset": -0.04
+          }
+        },
+        {
+          "slot": "bench",
+          "category": "bench",
+          "required": false,
+          "furnishing_level_min": "full",
+          "z_layer": 2,
+          "position": {
+            "anchor": "bed-foot-center",
+            "depth_zone": "mid",
+            "x_offset": 0.0,
+            "y_offset": 0.04
+          }
+        },
+        {
+          "slot": "dresser",
+          "category": "dresser",
+          "required": false,
+          "furnishing_level_min": "full",
+          "z_layer": 1,
+          "position": {
+            "anchor": "left-wall-center",
+            "depth_zone": "mid",
+            "x_offset": 0.0,
+            "y_offset": 0.0
+          }
+        }
+      ]
+    },
+
+    {
+      "id": "bedroom-minimal",
+      "name": "Minimal Bedroom",
+      "furnishing_levels": ["light"],
+
+      "pieces": [
+        {
+          "slot": "rug",
+          "category": "rug",
+          "required": true,
+          "z_layer": 0,
+          "position": {
+            "anchor": "back-center",
+            "depth_zone": "mid",
+            "x_offset": 0.0,
+            "y_offset": 0.3
+          }
+        },
+        {
+          "slot": "primary_bed",
+          "category": "bed",
+          "required": true,
+          "z_layer": 1,
+          "position": {
+            "anchor": "back-center",
+            "depth_zone": "far",
+            "x_offset": 0.0,
+            "y_offset": 0.0
+          }
+        },
+        {
+          "slot": "nightstand_right",
+          "category": "nightstand",
+          "required": false,
+          "z_layer": 2,
+          "position": {
+            "anchor": "bed-right-side",
+            "depth_zone": "far",
+            "x_offset": 0.18,
+            "y_offset": 0.0
+          }
+        }
+      ]
+    }
+  ]
+}

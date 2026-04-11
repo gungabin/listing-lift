@@ -4,7 +4,7 @@
     {
       "name": "listing-lift",
       "runtimeExecutable": "/Users/benjaminforehand/.nvm/versions/node/v24.14.1/bin/node",
-      "runtimeArgs": ["/Users/benjaminforehand/.nvm/versions/node/v24.14.1/bin/npm", "run", "dev"],
+      "runtimeArgs": ["/Users/benjaminforehand/Desktop/CO WORK/Listing Lift/node_modules/.bin/vite", "--port", "5173"],
       "port": 5173
     }
   ]

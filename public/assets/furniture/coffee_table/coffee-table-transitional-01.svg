@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 200" width="600" height="200">
+  <!-- Table top -->
+  <rect x="20" y="30" width="560" height="80" rx="6" ry="6" fill="#8B6840"/>
+  <!-- Table top surface highlight -->
+  <rect x="30" y="35" width="540" height="20" rx="4" ry="4" fill="#A07850" opacity="0.5"/>
+  <!-- Table top edge shadow -->
+  <rect x="20" y="95" width="560" height="15" rx="0" ry="0" fill="#6B5030"/>
+  <!-- Lower shelf -->
+  <rect x="60" y="140" width="480" height="30" rx="4" ry="4" fill="#7A5C35"/>
+  <!-- Front left leg -->
+  <rect x="55" y="108" width="22" height="70" rx="4" ry="4" fill="#6B5030"/>
+  <!-- Front right leg -->
+  <rect x="523" y="108" width="22" height="70" rx="4" ry="4" fill="#6B5030"/>
+  <!-- Back left leg (thinner, partial) -->
+  <rect x="90" y="108" width="14" height="50" rx="3" ry="3" fill="#5A4025"/>
+  <!-- Back right leg (thinner, partial) -->
+  <rect x="496" y="108" width="14" height="50" rx="3" ry="3" fill="#5A4025"/>
+  <!-- Wood grain lines on top -->
+  <line x1="20" y1="55" x2="580" y2="55" stroke="#7A5830" stroke-width="1" opacity="0.4"/>
+  <line x1="20" y1="70" x2="580" y2="70" stroke="#7A5830" stroke-width="1" opacity="0.3"/>
+  <line x1="20" y1="85" x2="580" y2="85" stroke="#7A5830" stroke-width="1" opacity="0.3"/>
+</svg>

@@ -1,0 +1,19 @@
+{
+  "id": "rug-transitional-01",
+  "category": "rug",
+  "styles": ["transitional", "traditional", "modern", "scandinavian"],
+  "width_ft": 9.0,
+  "depth_ft": 12.0,
+  "is_flat": true,
+  "floor_anchor_y": 1.0,
+  "shadow": {
+    "opacity": 0.10,
+    "edge_blur_px": 8
+  },
+  "z_layer": 0,
+  "default_zone": "floor-center",
+  "needs_rug": false,
+  "palette": ["#EAE2D6", "#C4B49A", "#D4C6B0"],
+  "tags": ["rug", "flat", "area-rug"],
+  "file": "rug/rug-transitional-01.svg"
+}

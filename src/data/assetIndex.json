@@ -1,0 +1,24 @@
+{
+  "version": "1.0.0",
+  "packs": [
+    {
+      "id": "transitional",
+      "name": "Transitional",
+      "styles": ["transitional"],
+      "assets": [
+        "sofa/sofa-transitional-01.json",
+        "coffee_table/coffee-table-transitional-01.json",
+        "accent_chair/accent-chair-transitional-01.json",
+        "floor_lamp/floor-lamp-transitional-01.json",
+        "side_table/side-table-transitional-01.json",
+        "rug/rug-transitional-01.json",
+        "plant/plant-transitional-01.json",
+        "bed/bed-queen-transitional-01.json",
+        "nightstand/nightstand-transitional-01.json",
+        "bench/bench-transitional-01.json",
+        "dresser/dresser-transitional-01.json",
+        "table_lamp/table-lamp-transitional-01.json"
+      ]
+    }
+  ]
+}

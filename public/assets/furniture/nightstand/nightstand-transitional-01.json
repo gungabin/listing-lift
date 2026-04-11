@@ -1,0 +1,22 @@
+{
+  "id": "nightstand-transitional-01",
+  "category": "nightstand",
+  "styles": ["transitional", "traditional", "modern"],
+  "width_ft": 1.75,
+  "depth_ft": 1.5,
+  "height_ft": 2.5,
+  "floor_anchor_y": 0.88,
+  "shadow": {
+    "opacity": 0.16,
+    "blur_px": 10,
+    "offset_x": 0.0,
+    "offset_y": 0.02,
+    "spread": 0.60
+  },
+  "z_layer": 2,
+  "default_zone": "bed-right-side",
+  "needs_rug": false,
+  "palette": ["#8B6840", "#9B7850", "#C0A070"],
+  "tags": ["nightstand", "bedside", "storage", "wood"],
+  "file": "nightstand/nightstand-transitional-01.svg"
+}

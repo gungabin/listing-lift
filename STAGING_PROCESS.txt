@@ -1,0 +1,353 @@
+================================================================================
+LISTING LIFT — FULL STAGING PROCESS
+From user submission → API call → compositing → result
+================================================================================
+Last updated: 2026-04-10
+
+
+────────────────────────────────────────────────────────────────────────────────
+STEP 1 — USER SUBMITS A JOB (Dashboard)
+────────────────────────────────────────────────────────────────────────────────
+User uploads a photo and picks:
+  - Room type:       living_room | bedroom | dining_room | kitchen | office | bathroom | outdoor | other
+  - Decor style:     modern | farmhouse | coastal | traditional | mid_century | scandinavian | transitional
+  - Furnishing level: light | medium | full
+
+The photo is stored two ways:
+  1. Converted to a blob URL → stored in the job record (for display)
+  2. The raw File object → stored in a Map called fileStore, keyed by blob URL (for API calls)
+
+A StagingJob record is written to localStorage and the UI redirects to the job detail page.
+stageJob() fires immediately in the background.
+
+
+────────────────────────────────────────────────────────────────────────────────
+STEP 2 — ENGINE SELECTION (stageJob function)
+────────────────────────────────────────────────────────────────────────────────
+Priority order:
+
+  1. REPLICATE (if VITE_REPLICATE_API_KEY env var OR ll_replicate_key in localStorage)
+     → Uses Flux Fill Pro with auto-generated inpaint mask + post-compositing
+     → Best room preservation (two layers of protection)
+
+  2. OPENAI (if VITE_OPENAI_API_KEY env var)
+     → Uses gpt-image-1 image edits with verbose preservation prompt + post-compositing
+     → Falls back if no Replicate key
+
+  3. MOCK (no key at all)
+     → Returns a random Unsplash room photo after 6–10 second delay
+     → UI only / no API cost
+
+
+────────────────────────────────────────────────────────────────────────────────
+STEP 3A — REPLICATE PATH (runReplicateStaging)
+────────────────────────────────────────────────────────────────────────────────
+
+3A-1. IMAGE PREP
+  - Retrieve original File from fileStore using the blob URL
+  - Convert to PNG using canvas (OpenAI required PNG; Replicate accepts PNG too)
+  - Convert PNG to base64 data URI (Replicate accepts data URIs, not blob URLs)
+
+3A-2. MASK GENERATION (generateInpaintMask)
+  Auto-generates a black-and-white PNG mask at the same pixel dimensions as the image:
+
+    BLACK (0,0,0)     = PRESERVE — model cannot touch these pixels
+    WHITE (255,255,255) = INPAINT  — model generates here
+
+  Zone layout (measured from top of image):
+    0%  – 28%   → solid black   (ceiling, upper walls, windows — fully locked)
+    28% – 45%   → gradient      (soft transition at wall/floor boundary)
+    45% – 100%  → solid white   (furniture zone — model generates here)
+
+  Why 28%/45%:
+    Real estate photos typically show ceiling + upper wall in the top 20–30%.
+    The gradient at 28–45% prevents a hard seam at the wall/floor boundary.
+    Furniture (sofas, chairs, coffee tables) all fit below 45% in wide-angle shots.
+
+  Limitation:
+    Tall items like floor lamps, tall bookshelves, or large artwork leaning high
+    may be partially cut off if they extend above the 45% line.
+
+3A-3. PROMPT (buildFluxPrompt)
+  Short and furniture-focused. The mask handles preservation, so no defensive
+  "don't touch the walls" rules are needed.
+
+  Template:
+    "Photorealistic interior design photograph. {STYLE}. Furnished {ROOM}. {LEVEL}.
+    Furniture has correct perspective and scale for the room, crisp sharp edges,
+    soft directional shadows on the floor. Professional real estate photography.
+    Natural lighting."
+
+  ROOM values:
+    living_room  → "living room with sofa, coffee table, accent chairs, area rug, and decorative accessories"
+    bedroom      → "bedroom with bed frame, nightstands, dresser, lamps, and bedding"
+    dining_room  → "dining room with dining table, dining chairs, sideboard, and pendant lighting"
+    kitchen      → "kitchen with bar stools at island or counter, small decorative accessories on countertops"
+    office       → "home office with desk, office chair, bookshelf, desk lamp, and accessories"
+    bathroom     → "bathroom with towels, bath mat, vanity accessories, and small decor"
+    outdoor      → "outdoor patio with outdoor furniture, planters, and outdoor accessories"
+    other        → "room with appropriate furniture and decor"
+
+  STYLE values:
+    modern        → "sleek modern style with clean lines, neutral tones, minimal clutter, high-contrast accents, polished surfaces"
+    farmhouse     → "warm farmhouse style with shiplap textures, natural wood tones, linen fabrics, vintage accents, cozy rustic warmth"
+    coastal       → "coastal style with light blues, whites, natural textures, woven accents, breezy and relaxed atmosphere"
+    traditional   → "classic traditional style with rich wood tones, symmetrical arrangements, formal elegance, warm deep colors"
+    mid_century   → "mid-century modern style with tapered legs, warm wood tones, earthy palette, retro geometric patterns"
+    scandinavian  → "Scandinavian style with white walls, light wood, minimal clean design, cozy hygge textures"
+    transitional  → "transitional style blending traditional and modern, neutral palette, sophisticated and timeless"
+
+  LEVEL values:
+    light  → "Add only a few key accent pieces — one or two small furniture items, minimal accessories. Keep it sparse and open."
+    medium → "Add the main furniture pieces for this room type and a moderate amount of accessories. Balanced and livable."
+    full   → "Fully stage the room with complete furniture arrangement, layered textiles, art, plants, and rich accessories. Lush and complete."
+
+  Example assembled prompt (Living Room / Transitional / Medium):
+    "Photorealistic interior design photograph. transitional style blending
+    traditional and modern, neutral palette, sophisticated and timeless.
+    Furnished living room with sofa, coffee table, accent chairs, area rug,
+    and decorative accessories. Add the main furniture pieces for this room
+    type and a moderate amount of accessories. Balanced and livable. Furniture
+    has correct perspective and scale for the room, crisp sharp edges, soft
+    directional shadows on the floor. Professional real estate photography.
+    Natural lighting."
+
+3A-4. API CALL
+  Endpoint:  POST /replicate-api/v1/models/black-forest-labs/flux-fill-pro/predictions
+             (proxied through Vite dev server → https://api.replicate.com)
+  Model:     black-forest-labs/flux-fill-pro
+  Cost:      $0.05 per image
+
+  Parameters sent:
+    image         → base64 PNG data URI of the original room photo
+    mask          → base64 PNG data URI of the auto-generated mask
+    prompt        → assembled text prompt (see 3A-3)
+    steps         → 50  (max quality; range 15–50)
+    guidance      → 60  (high prompt adherence; range 1.5–100)
+    output_format → "png"
+    safety_tolerance → 6  (most permissive; range 1–6)
+
+  Headers:
+    Authorization: Bearer {REPLICATE_API_KEY}
+    Prefer: wait=60  (sync response if completes within 60 seconds)
+
+  Response:
+    If status === "succeeded" → output is a URL to the generated PNG
+    Otherwise → poll every 3 seconds at /replicate-api/v1/predictions/{id}
+    Timeout after 60 poll attempts (~3 minutes)
+
+3A-5. OUTPUT
+  The Replicate output URL is a temporary CDN link. We:
+    1. Fetch it as a blob
+    2. Create a local blob URL for display
+    3. Pass it to compositeStructure() (see Step 4)
+
+
+────────────────────────────────────────────────────────────────────────────────
+STEP 3B — OPENAI PATH (runAiStaging)
+────────────────────────────────────────────────────────────────────────────────
+
+3B-1. IMAGE PREP
+  - Retrieve original File from fileStore
+  - Convert to PNG (required by OpenAI)
+
+3B-2. PROMPT (buildStagingPrompt)
+  Very verbose — must describe preservation rules because gpt-image-1 regenerates
+  the entire scene and has no mask support via the edits endpoint.
+
+  Full prompt text:
+
+  ─────────────────────────────────────────────────────────────────
+  "This is a real estate photograph of an empty room. Your ONLY task is to
+  place freestanding furniture and accessories into the empty space. You are
+  adding objects to a photograph — nothing about the photograph itself changes.
+  Every pixel not covered by furniture you add must be 100% identical to the
+  original image.
+
+  ═══════════════════════════════════════
+  PRESERVATION RULES — READ THESE FIRST
+  These are absolute. Violating any one is a complete failure.
+  ═══════════════════════════════════════
+
+  FLOOR — MOST CRITICAL:
+  The floor is a fixed, permanent feature of this property. It must appear
+  exactly as it does in the original photograph in every area not directly
+  covered by furniture you place.
+  - DO NOT change the floor color, stain, tone, or finish in any way
+  - DO NOT lighten, darken, warm, cool, or recolor the flooring
+  - DO NOT change the wood species, plank width, grain pattern, or texture
+  - DO NOT add sheen, gloss, or polish that does not exist in the original
+  - DO NOT blur, sharpen, or alter the floor surface in any way
+  - Floor visible around furniture legs, between pieces, and at room edges
+    must be pixel-perfect identical to the original
+  - If the original floor looks raw, unfinished, or light in tone — it must
+    remain exactly that way
+
+  WINDOWS & EXTERIOR VIEW:
+  - Every window must look exactly as it does in the original — same frame,
+    same glass, same exterior view
+  - If the exterior view is overexposed, blown out, bright white, or partially
+    visible — it must remain that way. DO NOT add trees, sky, foliage,
+    buildings, or any scenery not clearly present in the original
+  - DO NOT add curtains, blinds, drapes, shutters, or any window treatments
+    of any kind
+  - DO NOT alter window frames, glass reflections, or mullions
+
+  WALLS:
+  - Wall color, paint, texture, paneling, wainscoting, board-and-batten,
+    shiplap, millwork, wallpaper — must be pixel-perfect identical to the
+    original
+  - DO NOT alter, enhance, brighten, or "improve" any wall surface
+
+  CEILING:
+  - Ceiling color, texture, coffered details, tray ceiling profiles, beams,
+    crown molding — must be pixel-perfect identical to the original
+  - DO NOT alter, lighten, or enhance the ceiling in any way
+
+  FIXED FIXTURES — every one of these must remain exactly as photographed:
+  - Recessed lights, can lights, ceiling fans, chandeliers, pendants, sconces
+  - HVAC vents, air returns, grilles, diffusers — exact appearance preserved
+  - Electrical outlets, switch plates, wall plates, coax plates, ethernet plates
+  - Smoke detectors, carbon monoxide detectors, sprinkler heads
+  - Thermostats, keypads, wall-mounted devices
+  - Baseboards, door frames, doors, built-in shelving, fireplaces,
+    built-in cabinetry
+  - If furniture would overlap a fixture, you may place furniture in front —
+    but never alter the fixture itself
+
+  LIGHTING & ATMOSPHERE:
+  - The room's existing natural and artificial lighting must remain unchanged
+  - DO NOT adjust brightness, contrast, exposure, saturation, or color
+    temperature of the room
+  - DO NOT add ambient light, fill light, or HDR enhancement to the space
+  - Only add cast shadows directly beneath furniture you place, matched to
+    the existing light direction
+
+  ═══════════════════════════════════════
+  WHAT YOU ARE ALLOWED TO ADD
+  ═══════════════════════════════════════
+  - Freestanding furniture placed on visible floor areas (sofas, chairs,
+    tables, beds, bookshelves)
+  - A single area rug placed under/beneath furniture groupings
+  - Small accessories placed on top of furniture you added (lamps, plants,
+    books, vases, bowls, art leaned against walls)
+  - All additions must match the room's existing perspective, lighting,
+    and scale exactly
+  - The final image must be photorealistic — indistinguishable from a
+    real photograph
+
+  ═══════════════════════════════════════
+  STAGING REQUIREMENTS
+  ═══════════════════════════════════════
+  Room: {ROOM_DESCRIPTOR}
+  Style: {STYLE_DESCRIPTOR}
+  Density: {LEVEL_DESCRIPTOR}
+
+  FINAL CHECK: Before finishing, verify — do the floors, walls, ceiling,
+  windows, and all fixtures look exactly as they did in the original photo?
+  If anything structural has changed, that is a failure. Undo it."
+  ─────────────────────────────────────────────────────────────────
+
+3B-3. API CALL
+  Endpoint:  POST https://api.openai.com/v1/images/edits
+  Model:     gpt-image-1
+  Cost:      ~$0.04–0.08 per image (high quality)
+
+  Parameters sent (multipart/form-data):
+    model   → "gpt-image-1"
+    prompt  → assembled text prompt (see 3B-2)
+    image   → PNG file of original room photo
+    quality → "high"
+    size    → "1536x1024"
+
+  Response:
+    data[0].b64_json → base64-encoded PNG of the staged image
+
+3B-4. OUTPUT
+  Decode base64 → blob → local blob URL → pass to compositeStructure()
+
+
+────────────────────────────────────────────────────────────────────────────────
+STEP 4 — FLOOR COMPOSITING (compositeStructure)
+────────────────────────────────────────────────────────────────────────────────
+Applied AFTER both Replicate and OpenAI outputs. Restores the original floor.
+
+APPROACH: Color-distance per pixel in the floor zone.
+
+  Zone layout:
+    0%  – 45% from top → skipped entirely (walls, ceiling — AI got these right via mask)
+    45% – 55% from top → transition zone (gradual blend)
+    55% – 100% from top → full floor zone
+
+  For each pixel in the floor zone:
+    1. Calculate Euclidean color distance between original pixel and AI pixel:
+       dist = sqrt((aiR-origR)² + (aiG-origG)² + (aiB-origB)²)
+
+    2. If dist < FLOOR_THRESHOLD (currently 120):
+       → AI just recolored/replaced the floor → RESTORE original pixel
+       (Weighted by zone strength: gradual in transition zone, full restore in floor zone)
+
+    3. If dist ≥ FLOOR_THRESHOLD:
+       → Something physically different is here (rug, furniture leg, shadow) → KEEP AI pixel
+
+  FLOOR_THRESHOLD = 120
+    - Was 55 (tuned for OpenAI's subtle recoloring)
+    - Raised to 120 for Flux Fill which does full floor replacement
+    - Risk: if rug is close in tone to original floor (both light/beige),
+      threshold may not catch all rug pixels cleanly → patchy edges
+    - Too high → rug starts getting erased
+    - Too low → floor still changes
+
+KNOWN ISSUE:
+  When the AI-generated rug is close in color to the original light wood floor
+  (both beige/light tones), the color distance is small and threshold comparison
+  incorrectly restores the original floor in those pixels, causing patchy/torn
+  edges at the rug boundary. This is the core unresolved compositing problem.
+
+
+────────────────────────────────────────────────────────────────────────────────
+STEP 5 — JOB COMPLETION
+────────────────────────────────────────────────────────────────────────────────
+  - Job status updated to "completed" in localStorage
+  - staged_image_url set to the composited blob URL
+  - generations_used incremented in subscription record
+  - Job detail page (polling every 3s) detects "completed" and shows the result
+  - User sees AI Staged / Original toggle
+
+
+────────────────────────────────────────────────────────────────────────────────
+OPEN PROBLEMS (as of 2026-04-10)
+────────────────────────────────────────────────────────────────────────────────
+1. FLOOR COMPOSITING ARTIFACTS
+   Light rugs on light floors → beige-on-beige → small color distance →
+   compositing incorrectly restores original floor pixels inside the rug →
+   patchy/torn rug edges. Need a better segmentation approach.
+
+2. MASK BOUNDARY
+   The 28%/45% mask boundary is hardcoded. A room with an unusually low
+   ceiling or extreme wide-angle lens could have the ceiling bleed below 28%.
+   Future: generate mask from depth estimation rather than fixed percentage.
+
+3. FLOOR STILL CHANGES SLIGHTLY IN TRANSITION ZONE
+   The 45–55% gradient means some floor pixels near the baseboard are only
+   partially restored. Usually not visible but can show on short rooms.
+
+4. BLOB URLS LOST ON REFRESH
+   Blob URLs (for uploaded photos and staged results) are session-only.
+   On refresh, jobs show as completed but images are gone. This is expected
+   for local dev — real backend will use persistent storage URLs.
+
+5. CORS IN PRODUCTION
+   The Vite proxy only works in local dev. Vercel deployment needs a
+   serverless function at /api/replicate that forwards calls server-side.
+
+
+────────────────────────────────────────────────────────────────────────────────
+FILES INVOLVED
+────────────────────────────────────────────────────────────────────────────────
+src/api/base44Client.js     — Everything: prompts, mask, API calls, compositing
+vite.config.js              — Replicate CORS proxy (dev only)
+src/pages/Account.jsx       — Replicate key input (saves to localStorage)
+src/pages/Dashboard.jsx     — Upload UI, job creation, stageImage invocation
+src/pages/JobDetail.jsx     — Result display, before/after toggle, polling
+================================================================================

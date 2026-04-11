@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 600" width="900" height="600">
+  <!-- Rug base -->
+  <rect x="0" y="0" width="900" height="600" rx="4" ry="4" fill="#EAE2D6"/>
+  <!-- Outer border -->
+  <rect x="18" y="18" width="864" height="564" rx="2" ry="2" fill="none" stroke="#C4B49A" stroke-width="12"/>
+  <!-- Inner border -->
+  <rect x="38" y="38" width="824" height="524" rx="2" ry="2" fill="none" stroke="#D4C6B0" stroke-width="6"/>
+  <!-- Second inner border -->
+  <rect x="52" y="52" width="796" height="496" rx="2" ry="2" fill="none" stroke="#C4B49A" stroke-width="3"/>
+  <!-- Center field subtle pattern: corner medallion hints -->
+  <circle cx="450" cy="300" r="120" fill="none" stroke="#D0C2AC" stroke-width="4"/>
+  <circle cx="450" cy="300" r="80" fill="none" stroke="#C8BAA4" stroke-width="2"/>
+  <!-- Diamond center -->
+  <path d="M450,190 L560,300 L450,410 L340,300 Z" fill="none" stroke="#C8BAA4" stroke-width="3"/>
+  <!-- Corner accents -->
+  <path d="M70,70 L120,70 L70,120 Z" fill="#C4B49A" opacity="0.5"/>
+  <path d="M830,70 L880,70 L880,120 Z" fill="#C4B49A" opacity="0.5"/>
+  <path d="M70,480 L70,530 L120,530 Z" fill="#C4B49A" opacity="0.5"/>
+  <path d="M880,480 L880,530 L830,530 Z" fill="#C4B49A" opacity="0.5"/>
+  <!-- Subtle texture dots -->
+  <circle cx="200" cy="150" r="3" fill="#C8BAA4" opacity="0.4"/>
+  <circle cx="300" cy="150" r="3" fill="#C8BAA4" opacity="0.4"/>
+  <circle cx="600" cy="150" r="3" fill="#C8BAA4" opacity="0.4"/>
+  <circle cx="700" cy="150" r="3" fill="#C8BAA4" opacity="0.4"/>
+  <circle cx="200" cy="450" r="3" fill="#C8BAA4" opacity="0.4"/>
+  <circle cx="300" cy="450" r="3" fill="#C8BAA4" opacity="0.4"/>
+  <circle cx="600" cy="450" r="3" fill="#C8BAA4" opacity="0.4"/>
+  <circle cx="700" cy="450" r="3" fill="#C8BAA4" opacity="0.4"/>
+</svg>

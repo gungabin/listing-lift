@@ -1,0 +1,22 @@
+{
+  "id": "bed-queen-transitional-01",
+  "category": "bed",
+  "styles": ["transitional", "traditional", "modern"],
+  "width_ft": 6.5,
+  "depth_ft": 7.0,
+  "height_ft": 4.5,
+  "floor_anchor_y": 0.90,
+  "shadow": {
+    "opacity": 0.20,
+    "blur_px": 20,
+    "offset_x": 0.0,
+    "offset_y": 0.02,
+    "spread": 0.85
+  },
+  "z_layer": 1,
+  "default_zone": "back-center",
+  "needs_rug": true,
+  "palette": ["#D8D0C6", "#F5F2EE", "#9B7A55"],
+  "tags": ["bed", "queen", "primary", "upholstered"],
+  "file": "bed/bed-queen-transitional-01.svg"
+}

@@ -1,0 +1,22 @@
+{
+  "id": "bench-transitional-01",
+  "category": "bench",
+  "styles": ["transitional", "traditional", "modern"],
+  "width_ft": 4.0,
+  "depth_ft": 1.5,
+  "height_ft": 1.75,
+  "floor_anchor_y": 0.88,
+  "shadow": {
+    "opacity": 0.16,
+    "blur_px": 12,
+    "offset_x": 0.0,
+    "offset_y": 0.02,
+    "spread": 0.70
+  },
+  "z_layer": 2,
+  "default_zone": "bed-foot-center",
+  "needs_rug": false,
+  "palette": ["#C8BFB4", "#9B7850", "#7A5C35"],
+  "tags": ["bench", "bedroom", "upholstered", "foot-of-bed"],
+  "file": "bench/bench-transitional-01.svg"
+}

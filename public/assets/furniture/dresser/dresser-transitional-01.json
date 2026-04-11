@@ -1,0 +1,22 @@
+{
+  "id": "dresser-transitional-01",
+  "category": "dresser",
+  "styles": ["transitional", "traditional", "modern"],
+  "width_ft": 4.0,
+  "depth_ft": 1.75,
+  "height_ft": 3.5,
+  "floor_anchor_y": 0.90,
+  "shadow": {
+    "opacity": 0.18,
+    "blur_px": 14,
+    "offset_x": 0.0,
+    "offset_y": 0.02,
+    "spread": 0.72
+  },
+  "z_layer": 1,
+  "default_zone": "left-wall-center",
+  "needs_rug": false,
+  "palette": ["#8B6840", "#9B7850", "#C0A070"],
+  "tags": ["dresser", "storage", "bedroom", "wood"],
+  "file": "dresser/dresser-transitional-01.svg"
+}

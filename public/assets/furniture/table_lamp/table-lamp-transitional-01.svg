@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 320" width="200" height="320">
+  <!-- Shade top opening -->
+  <ellipse cx="100" cy="60" rx="38" ry="10" fill="#D4C8B0"/>
+  <!-- Shade body -->
+  <path d="M62,60 L30,190 L170,190 L138,60 Z" fill="#F0E8D8"/>
+  <!-- Shade highlight -->
+  <path d="M72,65 L50,175 L100,175 L100,65 Z" fill="#FAF4EA" opacity="0.5"/>
+  <!-- Shade bottom rim -->
+  <ellipse cx="100" cy="190" rx="70" ry="15" fill="#D4C8B0"/>
+  <!-- Upper neck -->
+  <rect x="93" y="200" width="14" height="25" rx="5" ry="5" fill="#B8A060"/>
+  <!-- Decorative base knob -->
+  <ellipse cx="100" cy="228" rx="22" ry="12" fill="#C4AA70"/>
+  <!-- Main body vase shape -->
+  <path d="M82,238 Q72,260 75,278 Q80,295 100,298 Q120,295 125,278 Q128,260 118,238 Z" fill="#B8A060"/>
+  <!-- Body highlight -->
+  <path d="M88,240 Q82,260 84,278 Q88,290 100,293" stroke="#D4C080" stroke-width="2" fill="none" opacity="0.5"/>
+  <!-- Base disc -->
+  <ellipse cx="100" cy="298" rx="35" ry="10" fill="#A08040"/>
+  <!-- Base rim detail -->
+  <ellipse cx="100" cy="296" rx="28" ry="7" fill="#B89050" opacity="0.6"/>
+  <!-- Glowing bulb hint -->
+  <circle cx="100" cy="193" r="10" fill="#FFFAE0" opacity="0.6"/>
+</svg>

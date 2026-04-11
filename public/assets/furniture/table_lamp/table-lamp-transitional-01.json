@@ -1,0 +1,22 @@
+{
+  "id": "table-lamp-transitional-01",
+  "category": "table_lamp",
+  "styles": ["transitional", "traditional", "modern"],
+  "width_ft": 1.0,
+  "depth_ft": 1.0,
+  "height_ft": 2.5,
+  "floor_anchor_y": 0.93,
+  "shadow": {
+    "opacity": 0.12,
+    "blur_px": 8,
+    "offset_x": 0.0,
+    "offset_y": 0.01,
+    "spread": 0.40
+  },
+  "z_layer": 3,
+  "default_zone": "nightstand-right-surface",
+  "needs_rug": false,
+  "palette": ["#F0E8D8", "#B8A060", "#A08040"],
+  "tags": ["lamp", "table-lamp", "lighting", "brass"],
+  "file": "table_lamp/table-lamp-transitional-01.svg"
+}

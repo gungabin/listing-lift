@@ -1,0 +1,22 @@
+{
+  "id": "accent-chair-transitional-01",
+  "category": "accent_chair",
+  "styles": ["transitional", "traditional", "modern"],
+  "width_ft": 2.75,
+  "depth_ft": 2.75,
+  "height_ft": 3.0,
+  "floor_anchor_y": 0.87,
+  "shadow": {
+    "opacity": 0.18,
+    "blur_px": 14,
+    "offset_x": 0.0,
+    "offset_y": 0.02,
+    "spread": 0.70
+  },
+  "z_layer": 2,
+  "default_zone": "coffee-table-left",
+  "needs_rug": false,
+  "palette": ["#D8CFC4", "#E0D8CC", "#9B7A55"],
+  "tags": ["seating", "accent", "upholstered"],
+  "file": "accent_chair/accent-chair-transitional-01.svg"
+}

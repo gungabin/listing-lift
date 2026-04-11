@@ -1,0 +1,182 @@
+{
+  "room_type": "living_room",
+  "aspect_ratio_target": "landscape",
+  "estimated_room_width_ft": 14,
+  "estimated_room_depth_ft": 16,
+
+  "anchor_positions": {
+    "floor-center":          { "u": 0.50, "v": 0.55 },
+    "back-center":           { "u": 0.50, "v": 0.12 },
+    "sofa-front-center":     { "u": 0.50, "v": 0.35 },
+    "coffee-table-left":     { "u": 0.28, "v": 0.40 },
+    "coffee-table-right":    { "u": 0.72, "v": 0.40 },
+    "sofa-right-corner":     { "u": 0.78, "v": 0.14 },
+    "sofa-left-corner":      { "u": 0.22, "v": 0.14 },
+    "back-right-corner":     { "u": 0.85, "v": 0.08 },
+    "back-left-corner":      { "u": 0.15, "v": 0.08 },
+    "accent-chair-left-side":{ "u": 0.14, "v": 0.40 }
+  },
+
+  "layouts": [
+    {
+      "id": "living-classic-grouping",
+      "name": "Classic Seating Grouping",
+      "min_room_width_ft": 12,
+      "furnishing_levels": ["medium", "full"],
+
+      "pieces": [
+        {
+          "slot": "rug",
+          "category": "rug",
+          "required": true,
+          "z_layer": 0,
+          "position": {
+            "anchor": "floor-center",
+            "depth_zone": "mid",
+            "x_offset": 0.0,
+            "y_offset": 0.0
+          }
+        },
+        {
+          "slot": "primary_sofa",
+          "category": "sofa",
+          "required": true,
+          "z_layer": 1,
+          "position": {
+            "anchor": "back-center",
+            "depth_zone": "far",
+            "x_offset": 0.0,
+            "y_offset": 0.05
+          }
+        },
+        {
+          "slot": "coffee_table",
+          "category": "coffee_table",
+          "required": true,
+          "furnishing_level_min": "light",
+          "z_layer": 2,
+          "position": {
+            "anchor": "sofa-front-center",
+            "depth_zone": "mid",
+            "x_offset": 0.0,
+            "y_offset": 0.0,
+            "gap_from_sofa_ft": 1.5
+          }
+        },
+        {
+          "slot": "accent_chair_left",
+          "category": "accent_chair",
+          "required": false,
+          "furnishing_level_min": "medium",
+          "z_layer": 2,
+          "position": {
+            "anchor": "coffee-table-left",
+            "depth_zone": "mid",
+            "x_offset": -0.22,
+            "y_offset": 0.0,
+            "angle_deg": 20
+          }
+        },
+        {
+          "slot": "accent_chair_right",
+          "category": "accent_chair",
+          "required": false,
+          "furnishing_level_min": "medium",
+          "z_layer": 2,
+          "position": {
+            "anchor": "coffee-table-right",
+            "depth_zone": "mid",
+            "x_offset": 0.22,
+            "y_offset": 0.0,
+            "angle_deg": -20
+          }
+        },
+        {
+          "slot": "floor_lamp",
+          "category": "floor_lamp",
+          "required": false,
+          "furnishing_level_min": "full",
+          "z_layer": 1,
+          "position": {
+            "anchor": "sofa-right-corner",
+            "depth_zone": "far",
+            "x_offset": 0.15,
+            "y_offset": 0.0
+          }
+        },
+        {
+          "slot": "side_table",
+          "category": "side_table",
+          "required": false,
+          "furnishing_level_min": "full",
+          "z_layer": 2,
+          "position": {
+            "anchor": "accent-chair-left-side",
+            "depth_zone": "mid",
+            "x_offset": 0.0,
+            "y_offset": 0.0
+          }
+        },
+        {
+          "slot": "plant",
+          "category": "plant",
+          "required": false,
+          "furnishing_level_min": "full",
+          "z_layer": 1,
+          "position": {
+            "anchor": "back-right-corner",
+            "depth_zone": "far",
+            "x_offset": 0.0,
+            "y_offset": 0.0
+          }
+        }
+      ]
+    },
+
+    {
+      "id": "living-minimal",
+      "name": "Minimal Staging",
+      "furnishing_levels": ["light"],
+
+      "pieces": [
+        {
+          "slot": "rug",
+          "category": "rug",
+          "required": true,
+          "z_layer": 0,
+          "position": {
+            "anchor": "floor-center",
+            "depth_zone": "mid",
+            "x_offset": 0.0,
+            "y_offset": 0.0
+          }
+        },
+        {
+          "slot": "primary_sofa",
+          "category": "sofa",
+          "required": true,
+          "z_layer": 1,
+          "position": {
+            "anchor": "back-center",
+            "depth_zone": "far",
+            "x_offset": 0.0,
+            "y_offset": 0.05
+          }
+        },
+        {
+          "slot": "coffee_table",
+          "category": "coffee_table",
+          "required": true,
+          "z_layer": 2,
+          "position": {
+            "anchor": "sofa-front-center",
+            "depth_zone": "mid",
+            "x_offset": 0.0,
+            "y_offset": 0.0,
+            "gap_from_sofa_ft": 1.5
+          }
+        }
+      ]
+    }
+  ]
+}
