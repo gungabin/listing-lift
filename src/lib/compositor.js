@@ -110,12 +110,14 @@ export async function compositeRoom({ originalImage, depthMap, roomType, decorSt
   // ── 4-6: Flatten onto base and export ─────────────────────────────────
   baseCtx.drawImage(compCanvas, 0, 0);
 
-  return new Promise((resolve, reject) => {
-    baseCanvas.toBlob(blob => {
-      if (!blob) return reject(new Error('Compositor: failed to export PNG'));
-      resolve(URL.createObjectURL(blob));
-    }, 'image/png');
-  });
+  // OffscreenCanvas uses convertToBlob(); HTMLCanvasElement uses toBlob()
+  const blob = baseCanvas.convertToBlob
+    ? await baseCanvas.convertToBlob({ type: 'image/png' })
+    : await new Promise((resolve, reject) => {
+        baseCanvas.toBlob(b => b ? resolve(b) : reject(new Error('toBlob failed')), 'image/png');
+      });
+
+  return URL.createObjectURL(blob);
 }
 
 // ── Shadow renderer ────────────────────────────────────────────────────────
