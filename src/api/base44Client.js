@@ -351,8 +351,9 @@ async function runReplicateStaging(job) {
 
   const prompt = buildFluxPrompt(job.room_type, job.decor_style, job.decor_level);
 
-  // Create prediction — use Prefer: wait=60 for fast sync response when possible
-  const createRes = await fetch('https://api.replicate.com/v1/models/black-forest-labs/flux-fill-pro/predictions', {
+  // Create prediction via Vite proxy (/replicate-api → https://api.replicate.com)
+  // This avoids CORS. In production, replace with a Vercel serverless function.
+  const createRes = await fetch('/replicate-api/v1/models/black-forest-labs/flux-fill-pro/predictions', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${apiKey}`,
@@ -383,7 +384,7 @@ async function runReplicateStaging(job) {
   }
 
   // Otherwise poll every 3 seconds (max ~3 minutes)
-  const pollUrl = `https://api.replicate.com/v1/predictions/${prediction.id}`;
+  const pollUrl = `/replicate-api/v1/predictions/${prediction.id}`;
   for (let i = 0; i < 60; i++) {
     await new Promise((r) => setTimeout(r, 3000));
     const pollRes = await fetch(pollUrl, {
