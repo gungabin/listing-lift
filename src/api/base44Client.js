@@ -336,7 +336,7 @@ async function replicateOutputToBlob(url) {
 
 // Call Flux Fill Pro on Replicate, poll until done, return a local blob URL
 async function runReplicateStaging(job) {
-  const apiKey = import.meta.env.VITE_REPLICATE_API_KEY;
+  const apiKey = import.meta.env.VITE_REPLICATE_API_KEY || localStorage.getItem('ll_replicate_key');
 
   const originalFile = fileStore.get(job.original_image_url);
   if (!originalFile) throw new Error('Original photo not found in session. Please re-upload and try again.');
@@ -596,7 +596,7 @@ async function stageJob(jobId) {
   try {
     let stagedImageUrl;
 
-    if (replicateKey) {
+    if (replicateKey || localStorage.getItem('ll_replicate_key')) {
       // Replicate Flux Fill Pro — true inpainting with mask (best quality + room preservation)
       console.info('[Listing Lift] Using Replicate Flux Fill Pro');
       stagedImageUrl = await runReplicateStaging(job);
